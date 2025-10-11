@@ -269,6 +269,60 @@ h1 {
     border-color: #667eea;
 }
 
+/* File Upload Section */
+.file-upload-section {
+    margin: 15px 0;
+}
+
+.upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: #f8f9fa;
+    border: 2px dashed #667eea;
+    border-radius: 8px;
+    color: #667eea;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.upload-btn:hover {
+    background: #e8eaf6;
+    border-color: #5568d3;
+}
+
+.selected-files {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #e8eaf6;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    color: #333;
+}
+
+.file-chip .remove-file {
+    cursor: pointer;
+    color: #dc3545;
+    font-weight: bold;
+    margin-left: 4px;
+}
+
+.file-chip .remove-file:hover {
+    color: #c82333;
+}
+
 #addNote {
     width: 100%;
     padding: 12px;
@@ -289,6 +343,56 @@ h1 {
 
 #addNote:active {
     transform: translateY(0);
+}
+
+/* File Attachments in Notes */
+.note-attachments {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.attachment-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    margin: 4px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #667eea;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.attachment-item:hover {
+    background: #e8eaf6;
+    transform: translateX(2px);
+}
+
+.attachment-icon {
+    width: 20px;
+    height: 20px;
+}
+
+.attachment-preview {
+    max-width: 100%;
+    margin-top: 10px;
+    border-radius: 8px;
+}
+
+.attachment-preview img {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.attachment-preview video {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
 }
 
 .notes-section {

@@ -76,7 +76,8 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increase limit for file uploads
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 
 // Auth middleware
@@ -145,10 +146,63 @@ app.get('/api/notes', authenticateUser, async (req, res) => {
     }
 });
 
+// Upload file to Supabase Storage
+app.post('/api/upload', authenticateUser, async (req, res) => {
+    try {
+        const { fileName, fileData, fileType } = req.body;
+        
+        if (!fileName || !fileData) {
+            return res.status(400).json({ error: 'File name and data are required' });
+        }
+        
+        // Convert base64 to buffer
+        const base64Data = fileData.split(',')[1];
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        // Generate unique file path: userId/timestamp-filename
+        const timestamp = Date.now();
+        const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `${req.user.uid}/${timestamp}-${sanitizedFileName}`;
+        
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+            .from('note-attachments')
+            .upload(filePath, buffer, {
+                contentType: fileType,
+                upsert: false
+            });
+        
+        if (error) {
+            console.error('Supabase storage error:', error);
+            throw error;
+        }
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('note-attachments')
+            .getPublicUrl(filePath);
+        
+        console.log('✅ File uploaded:', filePath);
+        
+        res.json({
+            success: true,
+            url: publicUrl,
+            path: filePath,
+            name: fileName,
+            size: buffer.length,
+            type: fileType
+        });
+        
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        res.status(500).json({ error: 'Failed to upload file: ' + error.message });
+    }
+});
+
 // Create a new note for authenticated user
 app.post('/api/notes', authenticateUser, async (req, res) => {
     try {
-        const { title, content } = req.body;
+        const { title, content, attachments } = req.body;
         
         if (!title || !content) {
             return res.status(400).json({ error: 'Title and content are required' });
@@ -160,7 +214,8 @@ app.post('/api/notes', authenticateUser, async (req, res) => {
                 title, 
                 content, 
                 user_id: req.user.uid,
-                user_email: req.user.email 
+                user_email: req.user.email,
+                attachments: attachments || []
             }])
             .select()
             .single();

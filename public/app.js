@@ -224,9 +224,17 @@ class NoteApp {
         this.noteContent = document.getElementById('noteContent');
         this.addNoteBtn = document.getElementById('addNote');
         this.notesList = document.getElementById('notesList');
+        this.fileInput = document.getElementById('fileInput');
+        this.uploadFileBtn = document.getElementById('uploadFileBtn');
+        this.selectedFilesDiv = document.getElementById('selectedFiles');
+        
+        // Store selected files
+        this.selectedFiles = [];
 
         // Add event listeners
         this.addNoteBtn.addEventListener('click', () => this.createNote());
+        this.uploadFileBtn.addEventListener('click', () => this.fileInput.click());
+        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
         
         // Allow Enter key in title to move to content
         this.noteTitle.addEventListener('keypress', (e) => {
@@ -234,6 +242,89 @@ class NoteApp {
                 e.preventDefault();
                 this.noteContent.focus();
             }
+        });
+    }
+
+    handleFileSelect(event) {
+        const files = Array.from(event.target.files);
+        
+        files.forEach(file => {
+            // Check file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                alert(`File ${file.name} is too large. Maximum size is 10MB.`);
+                return;
+            }
+            
+            this.selectedFiles.push(file);
+        });
+        
+        this.displaySelectedFiles();
+        event.target.value = ''; // Reset input
+    }
+
+    displaySelectedFiles() {
+        this.selectedFilesDiv.innerHTML = '';
+        
+        this.selectedFiles.forEach((file, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'file-chip';
+            chip.innerHTML = `
+                <span>${this.getFileIcon(file.type)} ${file.name}</span>
+                <span class="remove-file" data-index="${index}">×</span>
+            `;
+            
+            chip.querySelector('.remove-file').addEventListener('click', () => {
+                this.selectedFiles.splice(index, 1);
+                this.displaySelectedFiles();
+            });
+            
+            this.selectedFilesDiv.appendChild(chip);
+        });
+    }
+
+    getFileIcon(type) {
+        if (type.startsWith('image/')) return '🖼️';
+        if (type.startsWith('video/')) return '🎥';
+        if (type.startsWith('audio/')) return '🎵';
+        if (type === 'application/pdf') return '📄';
+        if (type.includes('word')) return '📝';
+        if (type.includes('excel') || type.includes('spreadsheet')) return '📊';
+        if (type.includes('zip') || type.includes('rar')) return '📦';
+        return '📎';
+    }
+
+    async uploadFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = async () => {
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.authToken}`
+                        },
+                        body: JSON.stringify({
+                            fileName: file.name,
+                            fileData: reader.result,
+                            fileType: file.type
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Upload failed');
+                    }
+                    
+                    const data = await response.json();
+                    resolve(data);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
         });
     }
 
@@ -248,26 +339,55 @@ class NoteApp {
         }
 
         try {
+            // Show loading state
+            this.addNoteBtn.disabled = true;
+            this.addNoteBtn.textContent = 'Creating...';
+            
             // Refresh token if needed
             this.authToken = await this.currentUser.getIdToken();
 
-            // Send POST request to backend with auth token
+            // Upload files if any
+            const attachments = [];
+            if (this.selectedFiles.length > 0) {
+                this.addNoteBtn.textContent = `Uploading ${this.selectedFiles.length} file(s)...`;
+                
+                for (const file of this.selectedFiles) {
+                    try {
+                        const uploadResult = await this.uploadFile(file);
+                        attachments.push({
+                            name: uploadResult.name,
+                            url: uploadResult.url,
+                            size: uploadResult.size,
+                            type: uploadResult.type
+                        });
+                    } catch (error) {
+                        console.error('Error uploading file:', file.name, error);
+                        alert(`Failed to upload ${file.name}. Continuing with other files.`);
+                    }
+                }
+            }
+
+            // Send POST request to backend with auth token and attachments
             const response = await fetch(this.apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.authToken}`
                 },
-                body: JSON.stringify({ title, content })
+                body: JSON.stringify({ title, content, attachments })
             });
 
             if (!response.ok) {
                 throw new Error('Failed to create note');
             }
 
+            console.log('✅ Note created with', attachments.length, 'attachment(s)');
+
             // Clear form
             this.noteTitle.value = '';
             this.noteContent.value = '';
+            this.selectedFiles = [];
+            this.displaySelectedFiles();
             this.noteTitle.focus();
 
             // Reload notes
@@ -275,6 +395,10 @@ class NoteApp {
         } catch (error) {
             console.error('Error creating note:', error);
             alert('Failed to create note. Please try again.');
+        } finally {
+            // Reset button
+            this.addNoteBtn.disabled = false;
+            this.addNoteBtn.textContent = 'Add Note';
         }
     }
 
@@ -342,9 +466,39 @@ class NoteApp {
             minute: '2-digit'
         });
 
+        let attachmentsHTML = '';
+        if (note.attachments && note.attachments.length > 0) {
+            attachmentsHTML = '<div class="note-attachments">';
+            
+            // Show image previews
+            const images = note.attachments.filter(att => att.type?.startsWith('image/'));
+            if (images.length > 0) {
+                attachmentsHTML += '<div class="attachment-preview">';
+                images.forEach(img => {
+                    attachmentsHTML += `<img src="${img.url}" alt="${this.escapeHtml(img.name)}" onclick="window.open('${img.url}', '_blank')" />`;
+                });
+                attachmentsHTML += '</div>';
+            }
+            
+            // Show all attachments as links
+            note.attachments.forEach(attachment => {
+                const icon = this.getFileIcon(attachment.type);
+                const sizeKB = Math.round(attachment.size / 1024);
+                attachmentsHTML += `
+                    <a href="${attachment.url}" target="_blank" class="attachment-item" download="${attachment.name}">
+                        <span>${icon}</span>
+                        <span>${this.escapeHtml(attachment.name)}</span>
+                        <span style="font-size: 0.8em; color: #999;">(${sizeKB} KB)</span>
+                    </a>
+                `;
+            });
+            attachmentsHTML += '</div>';
+        }
+
         card.innerHTML = `
             <h3>${this.escapeHtml(note.title)}</h3>
             <p>${this.escapeHtml(note.content)}</p>
+            ${attachmentsHTML}
             <span class="note-date">${formattedDate}</span>
         `;
 
