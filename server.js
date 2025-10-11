@@ -14,9 +14,10 @@ console.log('PORT:', PORT);
 console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? '✓ Set' : '✗ Not set');
 console.log('SUPABASE_KEY:', process.env.SUPABASE_KEY ? '✓ Set' : '✗ Not set');
 console.log('FIREBASE_SERVICE_ACCOUNT:', process.env.FIREBASE_SERVICE_ACCOUNT ? '✓ Set' : '✗ Not set');
-console.log('FIREBASE_API_KEY:', process.env.FIREBASE_API_KEY ? '✓ Set' : '✗ Not set');
-console.log('FIREBASE_AUTH_DOMAIN:', process.env.FIREBASE_AUTH_DOMAIN ? '✓ Set' : '✗ Not set');
-console.log('FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID ? '✓ Set' : '✗ Not set');
+console.log('Firebase Auth (Required):');
+console.log('  FIREBASE_API_KEY:', process.env.FIREBASE_API_KEY ? '✓ Set' : '✗ Not set');
+console.log('  FIREBASE_AUTH_DOMAIN:', process.env.FIREBASE_AUTH_DOMAIN ? '✓ Set' : '✗ Not set');
+console.log('  FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID ? '✓ Set' : '✗ Not set');
 
 // Initialize Firebase Admin
 let serviceAccount;
@@ -107,14 +108,21 @@ async function authenticateUser(req, res, next) {
 
 // Get Firebase configuration for frontend
 app.get('/api/config/firebase', (req, res) => {
+    // Only include essential Firebase Auth configuration
     const firebaseConfig = {
         apiKey: process.env.FIREBASE_API_KEY,
         authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.FIREBASE_APP_ID
+        projectId: process.env.FIREBASE_PROJECT_ID
     };
+    
+    // Validate required fields
+    if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+        console.error('❌ Missing required Firebase configuration!');
+        console.error('   Required: FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_PROJECT_ID');
+        return res.status(500).json({ 
+            error: 'Firebase configuration incomplete. Please contact administrator.' 
+        });
+    }
     
     res.json(firebaseConfig);
 });

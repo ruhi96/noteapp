@@ -68,13 +68,13 @@ Edit `.env`:
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_KEY=your_supabase_anon_key
 
-# Firebase Frontend (from Firebase Console > Project Settings > Your apps)
+# Firebase Admin (Backend)
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
+
+# Firebase Frontend (Auth only - from Firebase Console > Project Settings > Your apps)
 FIREBASE_API_KEY=your_firebase_api_key
 FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
 FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
-FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
-FIREBASE_APP_ID=your_firebase_app_id
 
 # Server
 PORT=3001
@@ -185,6 +185,8 @@ note-app/
 
 All Firebase configuration is now managed via environment variables for easy deployment on Render.
 
+**Note:** This app only uses Firebase for Authentication (Google Sign-in), so we only need 3 Firebase frontend variables.
+
 | Variable | Description | Required | Where to Find |
 |----------|-------------|----------|---------------|
 | `SUPABASE_URL` | Supabase project URL | Yes | Supabase Dashboard → Project Settings → API |
@@ -193,10 +195,9 @@ All Firebase configuration is now managed via environment variables for easy dep
 | `FIREBASE_API_KEY` | Firebase web API key | Yes | Firebase Console → Project Settings → Your apps → Web app |
 | `FIREBASE_AUTH_DOMAIN` | Firebase auth domain | Yes | Firebase Console → Project Settings → Your apps → Web app |
 | `FIREBASE_PROJECT_ID` | Firebase project ID | Yes | Firebase Console → Project Settings → Your apps → Web app |
-| `FIREBASE_STORAGE_BUCKET` | Firebase storage bucket | Yes | Firebase Console → Project Settings → Your apps → Web app |
-| `FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID | Yes | Firebase Console → Project Settings → Your apps → Web app |
-| `FIREBASE_APP_ID` | Firebase app ID | Yes | Firebase Console → Project Settings → Your apps → Web app |
 | `PORT` | Server port | No | Default: 3001 |
+
+**Total: 6 required environment variables** (+ 1 optional PORT)
 
 ## Security
 

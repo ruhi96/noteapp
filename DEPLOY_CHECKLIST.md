@@ -49,7 +49,7 @@ Get-Content .\your-downloaded-file.json | ConvertFrom-Json | ConvertTo-Json -Com
 
 ### 4. Verify All Environment Variables Are Set
 
-Make sure you have ALL 9 variables set in Render:
+Make sure you have ALL 6 variables set in Render (we only need 3 Firebase frontend variables for Auth):
 
 #### ✅ Supabase (2 variables)
 - [ ] `SUPABASE_URL`
@@ -58,13 +58,12 @@ Make sure you have ALL 9 variables set in Render:
 #### ✅ Firebase Admin (1 variable)
 - [ ] `FIREBASE_SERVICE_ACCOUNT` ← **YOU ARE HERE**
 
-#### ✅ Firebase Frontend (6 variables)
+#### ✅ Firebase Frontend - Auth Only (3 variables)
 - [ ] `FIREBASE_API_KEY`
 - [ ] `FIREBASE_AUTH_DOMAIN`
 - [ ] `FIREBASE_PROJECT_ID`
-- [ ] `FIREBASE_STORAGE_BUCKET`
-- [ ] `FIREBASE_MESSAGING_SENDER_ID`
-- [ ] `FIREBASE_APP_ID`
+
+**Note:** Storage, Messaging, and App ID are NOT required since we only use Firebase for authentication.
 
 ### 5. Redeploy
 
@@ -79,18 +78,18 @@ After saving the environment variables, Render will automatically redeploy.
 1. Go to Firebase Console → Project Settings
 2. Scroll down to **Your apps** section
 3. Click on the **Web app** (</> icon)
-4. You'll see the `firebaseConfig` object - copy these values:
+4. You'll see the `firebaseConfig` object - copy only these 3 values:
 
 ```javascript
 const firebaseConfig = {
-  apiKey: "AIza...",              // → FIREBASE_API_KEY
+  apiKey: "AIza...",                 // → FIREBASE_API_KEY
   authDomain: "xxx.firebaseapp.com", // → FIREBASE_AUTH_DOMAIN
-  projectId: "xxx",               // → FIREBASE_PROJECT_ID
-  storageBucket: "xxx.appspot.com", // → FIREBASE_STORAGE_BUCKET
-  messagingSenderId: "123...",    // → FIREBASE_MESSAGING_SENDER_ID
-  appId: "1:123..."               // → FIREBASE_APP_ID
+  projectId: "xxx",                  // → FIREBASE_PROJECT_ID
+  // We don't need storageBucket, messagingSenderId, or appId
 };
 ```
+
+**We only use Firebase for Authentication, so only 3 variables are needed!**
 
 ## Common Mistakes
 
