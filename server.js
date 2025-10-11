@@ -86,10 +86,13 @@ async function authenticateUser(req, res, next) {
         const authHeader = req.headers.authorization;
         
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Unauthorized' });
+            console.error('❌ No authorization header found');
+            return res.status(401).json({ error: 'Unauthorized - No token provided' });
         }
         
         const token = authHeader.split('Bearer ')[1];
+        console.log('🔐 Verifying Firebase token...');
+        
         const decodedToken = await admin.auth().verifyIdToken(token);
         
         req.user = {
@@ -98,10 +101,13 @@ async function authenticateUser(req, res, next) {
             name: decodedToken.name
         };
         
+        console.log('✅ Token verified for user:', req.user.email);
+        console.log('   UID:', req.user.uid);
+        
         next();
     } catch (error) {
-        console.error('Auth error:', error);
-        return res.status(401).json({ error: 'Unauthorized' });
+        console.error('❌ Auth verification error:', error.message);
+        return res.status(401).json({ error: 'Unauthorized - Invalid token' });
     }
 }
 
@@ -208,24 +214,37 @@ app.post('/api/notes', authenticateUser, async (req, res) => {
             return res.status(400).json({ error: 'Title and content are required' });
         }
         
+        const noteData = { 
+            title, 
+            content, 
+            user_id: req.user.uid,
+            user_email: req.user.email,
+            attachments: attachments || []
+        };
+        
+        console.log('📝 Creating note for user:', req.user.email);
+        console.log('   User ID:', req.user.uid);
+        console.log('   Attachments:', attachments?.length || 0);
+        
         const { data, error } = await supabase
             .from('notes')
-            .insert([{ 
-                title, 
-                content, 
-                user_id: req.user.uid,
-                user_email: req.user.email,
-                attachments: attachments || []
-            }])
+            .insert([noteData])
             .select()
             .single();
         
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Supabase insert error:', error);
+            throw error;
+        }
+        
+        console.log('✅ Note created successfully with ID:', data.id);
+        console.log('   Stored user_id:', data.user_id);
+        console.log('   Stored user_email:', data.user_email);
         
         res.status(201).json(data);
     } catch (error) {
         console.error('Error creating note:', error);
-        res.status(500).json({ error: 'Failed to create note' });
+        res.status(500).json({ error: 'Failed to create note: ' + error.message });
     }
 });
 
