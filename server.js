@@ -74,12 +74,14 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseStorageEndpoint = process.env.SUPABASE_STORAGE_ENDPOINT;
+const dodoPaymentsApiKey = process.env.DODO_PAYMENTS_API_KEY;
 
 console.log('📦 Supabase Configuration:');
 console.log('   URL:', supabaseUrl);
 console.log('   Anon Key:', supabaseKey ? '✓ Set' : '❌ Missing');
 console.log('   Service Key:', supabaseServiceKey ? '✓ Set' : '❌ Missing');
 console.log('   Storage Endpoint:', supabaseStorageEndpoint);
+console.log('💳 DODO Payments API Key:', dodoPaymentsApiKey ? '✓ Set' : '❌ Missing');
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
@@ -163,6 +165,191 @@ app.get('/api/config/supabase', (req, res) => {
     }
     
     res.json(supabaseConfig);
+});
+
+// Create DODO Payments checkout session
+app.post('/api/payments/create-checkout', authenticateUser, async (req, res) => {
+    try {
+        const { productId } = req.body;
+        
+        if (!productId) {
+            return res.status(400).json({ error: 'Product ID is required' });
+        }
+
+        if (!dodoPaymentsApiKey) {
+            console.error('❌ DODO Payments API key not configured');
+            return res.status(500).json({ error: 'Payment system not configured' });
+        }
+
+        console.log('💳 Creating checkout session for user:', req.user.email);
+        console.log('   Product ID:', productId);
+
+        // Prepare customer information from Firebase user
+        const customer = {
+            email: req.user.email,
+            name: req.user.displayName || req.user.email.split('@')[0],
+            phone_number: req.user.phoneNumber || null
+        };
+
+        // Prepare billing address (optional - can be collected from user)
+        const billing_address = {
+            street: '123 Main St', // Default or collect from user
+            city: 'San Francisco',
+            state: 'CA',
+            country: 'US',
+            zipcode: '94102'
+        };
+
+        // Prepare checkout session data
+        const checkoutData = {
+            product_cart: [
+                {
+                    product_id: productId,
+                    quantity: 1
+                }
+            ],
+            customer: customer,
+            billing_address: billing_address,
+            return_url: 'https://noteapp-moei.onrender.com/payment/success',
+            cancel_url: 'https://noteapp-moei.onrender.com/payment/cancel',
+            metadata: {
+                user_id: req.user.uid,
+                user_email: req.user.email,
+                source: 'note_app_premium_upgrade',
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        console.log('📤 Sending request to DODO Payments:', JSON.stringify(checkoutData, null, 2));
+
+        // Call DODO Payments API
+        const response = await fetch('https://test.dodopayments.com/checkouts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${dodoPaymentsApiKey}`
+            },
+            body: JSON.stringify(checkoutData)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ DODO Payments API error:', response.status, errorText);
+            throw new Error(`DODO Payments API error: ${response.status} - ${errorText}`);
+        }
+
+        const session = await response.json();
+        
+        console.log('✅ Checkout session created successfully');
+        console.log('   Session ID:', session.session_id);
+        console.log('   Checkout URL:', session.checkout_url);
+
+        // Log the checkout session to database for tracking (optional)
+        try {
+            const { error: logError } = await supabase
+                .from('payment_sessions')
+                .insert([{
+                    user_id: req.user.uid,
+                    user_email: req.user.email,
+                    session_id: session.session_id,
+                    product_id: productId,
+                    checkout_url: session.checkout_url,
+                    status: 'created',
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (logError) {
+                console.warn('⚠️ Failed to log payment session:', logError.message);
+            }
+        } catch (logError) {
+            console.warn('⚠️ Failed to log payment session:', logError.message);
+        }
+
+        res.json({
+            success: true,
+            checkout_url: session.checkout_url,
+            session_id: session.session_id
+        });
+
+    } catch (error) {
+        console.error('❌ Error creating checkout session:', error);
+        res.status(500).json({ 
+            error: 'Failed to create checkout session: ' + error.message 
+        });
+    }
+});
+
+// Handle payment success callback
+app.get('/payment/success', async (req, res) => {
+    try {
+        const { session_id, payment_status } = req.query;
+        
+        console.log('✅ Payment success callback received');
+        console.log('   Session ID:', session_id);
+        console.log('   Payment Status:', payment_status);
+
+        // Update payment session status in database
+        if (session_id) {
+            try {
+                const { error } = await supabase
+                    .from('payment_sessions')
+                    .update({ 
+                        status: payment_status || 'completed',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('session_id', session_id);
+
+                if (error) {
+                    console.warn('⚠️ Failed to update payment session:', error.message);
+                }
+            } catch (updateError) {
+                console.warn('⚠️ Failed to update payment session:', updateError.message);
+            }
+        }
+
+        // Redirect to app with success message
+        res.redirect('https://noteapp-moei.onrender.com?payment=success');
+        
+    } catch (error) {
+        console.error('❌ Error handling payment success:', error);
+        res.redirect('https://noteapp-moei.onrender.com?payment=error');
+    }
+});
+
+// Handle payment cancellation
+app.get('/payment/cancel', async (req, res) => {
+    try {
+        const { session_id } = req.query;
+        
+        console.log('❌ Payment cancelled');
+        console.log('   Session ID:', session_id);
+
+        // Update payment session status in database
+        if (session_id) {
+            try {
+                const { error } = await supabase
+                    .from('payment_sessions')
+                    .update({ 
+                        status: 'cancelled',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('session_id', session_id);
+
+                if (error) {
+                    console.warn('⚠️ Failed to update payment session:', error.message);
+                }
+            } catch (updateError) {
+                console.warn('⚠️ Failed to update payment session:', updateError.message);
+            }
+        }
+
+        // Redirect to app with cancellation message
+        res.redirect('https://noteapp-moei.onrender.com?payment=cancelled');
+        
+    } catch (error) {
+        console.error('❌ Error handling payment cancellation:', error);
+        res.redirect('https://noteapp-moei.onrender.com?payment=error');
+    }
 });
 
 // Get all notes for authenticated user

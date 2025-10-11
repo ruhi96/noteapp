@@ -23,6 +23,9 @@ class NoteApp {
 
         // Set up auth screen listeners
         this.setupAuthListeners();
+        
+        // Handle payment redirects
+        this.handlePaymentRedirects();
     }
 
     setupAuthListeners() {
@@ -39,6 +42,9 @@ class NoteApp {
         
         // Sign out
         document.getElementById('signOutBtn').addEventListener('click', () => this.signOut());
+        
+        // Premium upgrade
+        document.getElementById('upgradePremiumBtn').addEventListener('click', () => this.upgradeToPremium());
         
         // Enter key handlers
         document.getElementById('loginPassword').addEventListener('keypress', (e) => {
@@ -534,6 +540,126 @@ class NoteApp {
         `;
 
         return card;
+    }
+
+    handlePaymentRedirects() {
+        // Check for payment status in URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentStatus = urlParams.get('payment');
+        
+        if (paymentStatus) {
+            // Clean up URL
+            const newUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+            
+            // Show appropriate message
+            switch (paymentStatus) {
+                case 'success':
+                    this.showSuccessMessage('🎉 Welcome to Premium! Your subscription is now active.');
+                    break;
+                case 'cancelled':
+                    this.showErrorMessage('Payment was cancelled. You can try again anytime.');
+                    break;
+                case 'error':
+                    this.showErrorMessage('Payment failed. Please try again or contact support.');
+                    break;
+                default:
+                    this.showErrorMessage('Payment status unknown. Please check your account.');
+            }
+        }
+    }
+
+    showSuccessMessage(message) {
+        // Create success notification
+        const notification = document.createElement('div');
+        notification.className = 'payment-notification success';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span class="notification-icon">✅</span>
+                <span class="notification-text">${message}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+
+    showErrorMessage(message) {
+        // Create error notification
+        const notification = document.createElement('div');
+        notification.className = 'payment-notification error';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span class="notification-icon">❌</span>
+                <span class="notification-text">${message}</span>
+                <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 7 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 7000);
+    }
+
+    async upgradeToPremium() {
+        try {
+            const upgradeBtn = document.getElementById('upgradePremiumBtn');
+            const originalText = upgradeBtn.textContent;
+            
+            // Disable button and show loading state
+            upgradeBtn.disabled = true;
+            upgradeBtn.textContent = '🔄 Processing...';
+            
+            console.log('💳 Starting premium upgrade for user:', this.currentUser.email);
+            
+            // Create checkout session
+            const response = await fetch('/api/payments/create-checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
+                },
+                body: JSON.stringify({
+                    productId: 'prod_123' // Replace with your actual product ID from DODO Payments
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create checkout session');
+            }
+
+            const checkoutData = await response.json();
+            
+            console.log('✅ Checkout session created:', checkoutData.session_id);
+            console.log('🔗 Redirecting to checkout URL:', checkoutData.checkout_url);
+            
+            // Redirect to DODO Payments checkout
+            window.location.href = checkoutData.checkout_url;
+            
+        } catch (error) {
+            console.error('❌ Error upgrading to premium:', error);
+            
+            // Reset button state
+            const upgradeBtn = document.getElementById('upgradePremiumBtn');
+            upgradeBtn.disabled = false;
+            upgradeBtn.textContent = '⭐ Upgrade to Premium';
+            
+            // Show error message
+            this.showError('Failed to start premium upgrade. Please try again.');
+        }
     }
 
     escapeHtml(text) {
