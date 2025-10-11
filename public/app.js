@@ -293,12 +293,14 @@ class NoteApp {
         return '📎';
     }
 
-    async uploadFile(file) {
+    async uploadFile(file, noteId) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             
             reader.onload = async () => {
                 try {
+                    console.log('📤 Uploading file:', file.name, 'for note ID:', noteId);
+                    
                     const response = await fetch('/api/upload', {
                         method: 'POST',
                         headers: {
@@ -308,15 +310,19 @@ class NoteApp {
                         body: JSON.stringify({
                             fileName: file.name,
                             fileData: reader.result,
-                            fileType: file.type
+                            fileType: file.type,
+                            noteId: noteId  // Map file to note ID
                         })
                     });
                     
                     if (!response.ok) {
-                        throw new Error('Upload failed');
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Upload failed');
                     }
                     
                     const data = await response.json();
+                    console.log('✅ File uploaded to:', data.storageEndpoint);
+                    console.log('   Path:', data.path);
                     resolve(data);
                 } catch (error) {
                     reject(error);
@@ -346,39 +352,64 @@ class NoteApp {
             // Refresh token if needed
             this.authToken = await this.currentUser.getIdToken();
 
-            // Upload files if any
-            const attachments = [];
-            if (this.selectedFiles.length > 0) {
-                this.addNoteBtn.textContent = `Uploading ${this.selectedFiles.length} file(s)...`;
-                
-                for (const file of this.selectedFiles) {
-                    try {
-                        const uploadResult = await this.uploadFile(file);
-                        attachments.push({
-                            name: uploadResult.name,
-                            url: uploadResult.url,
-                            size: uploadResult.size,
-                            type: uploadResult.type
-                        });
-                    } catch (error) {
-                        console.error('Error uploading file:', file.name, error);
-                        alert(`Failed to upload ${file.name}. Continuing with other files.`);
-                    }
-                }
-            }
-
-            // Send POST request to backend with auth token and attachments
+            // First, create the note to get the note ID
             const response = await fetch(this.apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.authToken}`
                 },
-                body: JSON.stringify({ title, content, attachments })
+                body: JSON.stringify({ title, content, attachments: [] })
             });
 
             if (!response.ok) {
                 throw new Error('Failed to create note');
+            }
+
+            const createdNote = await response.json();
+            const noteId = createdNote.id;
+            
+            console.log('✅ Note created with ID:', noteId);
+
+            // Upload files if any, mapped to the note ID
+            const attachments = [];
+            if (this.selectedFiles.length > 0) {
+                this.addNoteBtn.textContent = `Uploading ${this.selectedFiles.length} file(s)...`;
+                
+                for (const file of this.selectedFiles) {
+                    try {
+                        const uploadResult = await this.uploadFile(file, noteId);
+                        attachments.push({
+                            name: uploadResult.name,
+                            url: uploadResult.url,
+                            path: uploadResult.path,
+                            size: uploadResult.size,
+                            type: uploadResult.type
+                        });
+                        console.log('✅ Uploaded:', file.name, 'to note ID:', noteId);
+                    } catch (error) {
+                        console.error('Error uploading file:', file.name, error);
+                        alert(`Failed to upload ${file.name}. Continuing with other files.`);
+                    }
+                }
+                
+                // Update note with attachments
+                if (attachments.length > 0) {
+                    this.addNoteBtn.textContent = 'Saving attachments...';
+                    
+                    const updateResponse = await fetch(`${this.apiUrl}/${noteId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.authToken}`
+                        },
+                        body: JSON.stringify({ attachments })
+                    });
+                    
+                    if (updateResponse.ok) {
+                        console.log('✅ Attachments saved to note ID:', noteId);
+                    }
+                }
             }
 
             console.log('✅ Note created with', attachments.length, 'attachment(s)');

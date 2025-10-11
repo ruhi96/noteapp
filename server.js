@@ -72,6 +72,12 @@ try {
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseStorageEndpoint = process.env.SUPABASE_STORAGE_ENDPOINT;
+
+console.log('📦 Supabase Configuration:');
+console.log('   URL:', supabaseUrl);
+console.log('   Storage Endpoint:', supabaseStorageEndpoint);
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Middleware
@@ -152,10 +158,10 @@ app.get('/api/notes', authenticateUser, async (req, res) => {
     }
 });
 
-// Upload file to Supabase Storage
+// Upload file to Supabase Storage (mapped to note)
 app.post('/api/upload', authenticateUser, async (req, res) => {
     try {
-        const { fileName, fileData, fileType } = req.body;
+        const { fileName, fileData, fileType, noteId } = req.body;
         
         if (!fileName || !fileData) {
             return res.status(400).json({ error: 'File name and data are required' });
@@ -165,12 +171,20 @@ app.post('/api/upload', authenticateUser, async (req, res) => {
         const base64Data = fileData.split(',')[1];
         const buffer = Buffer.from(base64Data, 'base64');
         
-        // Generate unique file path: userId/timestamp-filename
+        // Generate unique file path mapped to note
+        // Format: userId/noteId/timestamp-filename (if noteId provided)
+        // Format: userId/temp/timestamp-filename (if no noteId yet)
         const timestamp = Date.now();
         const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const filePath = `${req.user.uid}/${timestamp}-${sanitizedFileName}`;
+        const folder = noteId || 'temp';
+        const filePath = `${req.user.uid}/${folder}/${timestamp}-${sanitizedFileName}`;
         
-        // Upload to Supabase Storage
+        console.log('📤 Uploading file to Supabase Storage:');
+        console.log('   Endpoint:', supabaseStorageEndpoint);
+        console.log('   Path:', filePath);
+        console.log('   Size:', buffer.length, 'bytes');
+        
+        // Upload to Supabase Storage at the specific endpoint
         const { data, error } = await supabase.storage
             .from('note-attachments')
             .upload(filePath, buffer, {
@@ -179,16 +193,18 @@ app.post('/api/upload', authenticateUser, async (req, res) => {
             });
         
         if (error) {
-            console.error('Supabase storage error:', error);
+            console.error('❌ Supabase storage error:', error);
             throw error;
         }
         
-        // Get public URL
+        // Get public URL using the storage endpoint
         const { data: { publicUrl } } = supabase.storage
             .from('note-attachments')
             .getPublicUrl(filePath);
         
-        console.log('✅ File uploaded:', filePath);
+        console.log('✅ File uploaded successfully');
+        console.log('   Storage path:', filePath);
+        console.log('   Public URL:', publicUrl);
         
         res.json({
             success: true,
@@ -196,7 +212,8 @@ app.post('/api/upload', authenticateUser, async (req, res) => {
             path: filePath,
             name: fileName,
             size: buffer.length,
-            type: fileType
+            type: fileType,
+            storageEndpoint: supabaseStorageEndpoint
         });
         
     } catch (error) {
@@ -245,6 +262,36 @@ app.post('/api/notes', authenticateUser, async (req, res) => {
     } catch (error) {
         console.error('Error creating note:', error);
         res.status(500).json({ error: 'Failed to create note: ' + error.message });
+    }
+});
+
+// Update note attachments
+app.patch('/api/notes/:id', authenticateUser, async (req, res) => {
+    try {
+        const noteId = req.params.id;
+        const { attachments } = req.body;
+        
+        console.log('📝 Updating note ID:', noteId, 'with', attachments?.length || 0, 'attachments');
+        
+        const { data, error } = await supabase
+            .from('notes')
+            .update({ attachments })
+            .eq('id', noteId)
+            .eq('user_id', req.user.uid)  // Ensure user owns the note
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('❌ Supabase update error:', error);
+            throw error;
+        }
+        
+        console.log('✅ Note updated with attachments');
+        
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating note:', error);
+        res.status(500).json({ error: 'Failed to update note: ' + error.message });
     }
 });
 
