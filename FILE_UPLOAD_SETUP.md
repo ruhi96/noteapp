@@ -21,7 +21,7 @@ https://epihgevunzsjsjplglax.storage.supabase.co/storage/v1/s3
 
 ### File Storage Structure:
 ```
-note-attachments/
+Note app/
 └── {userId}/
     └── {noteId}/
         ├── 1699123456789-image.jpg
@@ -42,7 +42,7 @@ note-attachments/
 1. Go to Supabase Dashboard → **Storage**
 2. Click **Create a new bucket**
 3. Configuration:
-   - **Name:** `note-attachments`
+   - **Name:** `Note app`
    - **Public bucket:** Toggle **ON**
    - Click **Create bucket**
 
@@ -85,7 +85,7 @@ Body: {
 }
 
 Response: {
-  url: "https://epihgevunzsjsjplglax.supabase.co/storage/v1/object/public/note-attachments/userId/noteId/file.pdf",
+  url: "https://epihgevunzsjsjplglax.supabase.co/storage/v1/object/public/Note app/userId/noteId/file.pdf",
   path: "userId/noteId/1699123456789-document.pdf",
   name: "document.pdf",
   size: 1024000,
@@ -125,14 +125,14 @@ Body: {
   "attachments": [
     {
       "name": "report.pdf",
-      "url": "https://epihgevunzsjsjplglax.supabase.co/storage/v1/object/public/note-attachments/userId/123/1699123456789-report.pdf",
+      "url": "https://epihgevunzsjsjplglax.supabase.co/storage/v1/object/public/Note app/userId/123/1699123456789-report.pdf",
       "path": "userId/123/1699123456789-report.pdf",
       "size": 2048000,
       "type": "application/pdf"
     },
     {
       "name": "image.jpg",
-      "url": "https://epihgevunzsjsjplglax.supabase.co/storage/v1/object/public/note-attachments/userId/123/1699123456790-image.jpg",
+      "url": "https://epihgevunzsjsjplglax.supabase.co/storage/v1/object/public/Note app/userId/123/1699123456790-image.jpg",
       "path": "userId/123/1699123456790-image.jpg",
       "size": 512000,
       "type": "image/jpeg"
@@ -209,7 +209,7 @@ Body: {
 ## 🐛 Troubleshooting
 
 ### Issue: "Bucket not found"
-**Solution:** Create `note-attachments` bucket in Supabase Storage
+**Solution:** Create `Note app` bucket in Supabase Storage
 
 ### Issue: "Row Level Security policy violation"
 **Solution:** Make bucket public OR set up storage policies
@@ -228,7 +228,7 @@ Body: {
 
 ## ✅ Verification Checklist
 
-- [ ] Created `note-attachments` bucket in Supabase
+- [ ] Created `Note app` bucket in Supabase
 - [ ] Bucket is set to Public
 - [ ] Added `attachments` column to notes table (JSONB)
 - [ ] Updated `.env` with correct `SUPABASE_URL` and `SUPABASE_KEY`
@@ -261,7 +261,7 @@ Body: {
 ```
 
 7. Check Supabase Storage:
-   - Should see: `note-attachments/abc123/1/1699123456789-file.pdf`
+   - Should see: `Note app/abc123/1/1699123456789-file.pdf`
 
 ## 📍 Important Notes
 

@@ -186,7 +186,7 @@ app.post('/api/upload', authenticateUser, async (req, res) => {
         
         // Upload to Supabase Storage at the specific endpoint
         const { data, error } = await supabase.storage
-            .from('note-attachments')
+            .from('Note app')
             .upload(filePath, buffer, {
                 contentType: fileType,
                 upsert: false
@@ -199,7 +199,7 @@ app.post('/api/upload', authenticateUser, async (req, res) => {
         
         // Get public URL using the storage endpoint
         const { data: { publicUrl } } = supabase.storage
-            .from('note-attachments')
+            .from('Note app')
             .getPublicUrl(filePath);
         
         console.log('✅ File uploaded successfully');
