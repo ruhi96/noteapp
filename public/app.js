@@ -21,9 +21,58 @@ class NoteApp {
             }
         });
 
-        // Set up auth button listeners
+        // Set up auth screen listeners
+        this.setupAuthListeners();
+    }
+
+    setupAuthListeners() {
+        // Tab switching
+        document.getElementById('loginTab').addEventListener('click', () => this.switchTab('login'));
+        document.getElementById('signupTab').addEventListener('click', () => this.switchTab('signup'));
+        
+        // Email/Password authentication
+        document.getElementById('emailLoginBtn').addEventListener('click', () => this.loginWithEmail());
+        document.getElementById('emailSignupBtn').addEventListener('click', () => this.signupWithEmail());
+        
+        // Google authentication
         document.getElementById('googleSignIn').addEventListener('click', () => this.signInWithGoogle());
+        
+        // Sign out
         document.getElementById('signOutBtn').addEventListener('click', () => this.signOut());
+        
+        // Enter key handlers
+        document.getElementById('loginPassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.loginWithEmail();
+        });
+        document.getElementById('signupPasswordConfirm').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.signupWithEmail();
+        });
+    }
+
+    switchTab(tab) {
+        const loginTab = document.getElementById('loginTab');
+        const signupTab = document.getElementById('signupTab');
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
+        
+        if (tab === 'login') {
+            loginTab.classList.add('active');
+            signupTab.classList.remove('active');
+            loginForm.style.display = 'flex';
+            signupForm.style.display = 'none';
+            this.clearErrors();
+        } else {
+            signupTab.classList.add('active');
+            loginTab.classList.remove('active');
+            signupForm.style.display = 'flex';
+            loginForm.style.display = 'none';
+            this.clearErrors();
+        }
+    }
+
+    clearErrors() {
+        document.getElementById('loginError').textContent = '';
+        document.getElementById('signupError').textContent = '';
     }
 
     waitForFirebase() {
@@ -67,12 +116,74 @@ class NoteApp {
         document.getElementById('appScreen').style.display = 'block';
     }
 
+    // Email/Password Sign Up - Client-side Firebase Auth
+    async signupWithEmail() {
+        const email = document.getElementById('signupEmail').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+        const errorDiv = document.getElementById('signupError');
+        
+        errorDiv.textContent = '';
+        
+        // Validation
+        if (!email || !password || !passwordConfirm) {
+            errorDiv.textContent = 'Please fill in all fields';
+            return;
+        }
+        
+        if (password !== passwordConfirm) {
+            errorDiv.textContent = 'Passwords do not match';
+            return;
+        }
+        
+        if (password.length < 6) {
+            errorDiv.textContent = 'Password must be at least 6 characters';
+            return;
+        }
+        
+        try {
+            // Firebase Web SDK - Create user with email and password
+            await auth.createUserWithEmailAndPassword(email, password);
+            console.log('✅ User created successfully');
+        } catch (error) {
+            console.error('Signup error:', error);
+            errorDiv.textContent = this.getErrorMessage(error);
+        }
+    }
+
+    // Email/Password Login - Client-side Firebase Auth
+    async loginWithEmail() {
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        const errorDiv = document.getElementById('loginError');
+        
+        errorDiv.textContent = '';
+        
+        // Validation
+        if (!email || !password) {
+            errorDiv.textContent = 'Please enter email and password';
+            return;
+        }
+        
+        try {
+            // Firebase Web SDK - Sign in with email and password
+            await auth.signInWithEmailAndPassword(email, password);
+            console.log('✅ Logged in successfully');
+        } catch (error) {
+            console.error('Login error:', error);
+            errorDiv.textContent = this.getErrorMessage(error);
+        }
+    }
+
+    // Google Sign-in - Client-side Firebase Auth
     async signInWithGoogle() {
         try {
+            // Firebase Web SDK - Sign in with Google popup
             await auth.signInWithPopup(googleProvider);
+            console.log('✅ Signed in with Google successfully');
         } catch (error) {
-            console.error('Error signing in:', error);
-            alert('Failed to sign in. Please try again.');
+            console.error('Error signing in with Google:', error);
+            alert('Failed to sign in with Google. Please try again.');
         }
     }
 
@@ -81,9 +192,29 @@ class NoteApp {
             await auth.signOut();
             this.currentUser = null;
             this.authToken = null;
+            console.log('✅ Signed out successfully');
         } catch (error) {
             console.error('Error signing out:', error);
             alert('Failed to sign out. Please try again.');
+        }
+    }
+
+    getErrorMessage(error) {
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                return 'This email is already registered';
+            case 'auth/invalid-email':
+                return 'Invalid email address';
+            case 'auth/user-not-found':
+                return 'No account found with this email';
+            case 'auth/wrong-password':
+                return 'Incorrect password';
+            case 'auth/weak-password':
+                return 'Password is too weak';
+            case 'auth/too-many-requests':
+                return 'Too many attempts. Please try again later';
+            default:
+                return error.message || 'Authentication failed';
         }
     }
 
