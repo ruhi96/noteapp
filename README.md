@@ -43,20 +43,8 @@ npm install
 3. Enable **Authentication** → **Google Sign-in**
 4. Get Web App Config:
    - Project Settings → Your apps → Web app
-   - Copy the config object
-5. Update `public/firebase-config.js` with your config:
-
-```javascript
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-```
-
+   - Copy the config values
+5. Add to your `.env` file (see step 4 below)
 6. Generate Service Account Key:
    - Project Settings → Service Accounts
    - Click "Generate New Private Key"
@@ -76,10 +64,23 @@ cp .env.example .env
 
 Edit `.env`:
 ```env
+# Supabase
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_KEY=your_supabase_anon_key
+
+# Firebase Frontend (from Firebase Console > Project Settings > Your apps)
+FIREBASE_API_KEY=your_firebase_api_key
+FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+FIREBASE_APP_ID=your_firebase_app_id
+
+# Server
 PORT=3001
 ```
+
+**Note:** You no longer need to manually edit `public/firebase-config.js`. The frontend now fetches Firebase config from the backend API using environment variables.
 
 ### 5. Start the Server
 
@@ -111,10 +112,7 @@ Get-Content firebase-service-account.json | ConvertFrom-Json | ConvertTo-Json -C
 2. Go to [Render Dashboard](https://dashboard.render.com/)
 3. New → Blueprint
 4. Connect your GitHub repo
-5. Add environment variables:
-   - `SUPABASE_URL`: Your Supabase project URL
-   - `SUPABASE_KEY`: Your Supabase anon key
-   - `FIREBASE_SERVICE_ACCOUNT`: Single-line JSON string from Step 1
+5. Add environment variables (see table below for all required variables)
 6. Click **Apply**
 
 #### Option B: Manual Setup
@@ -185,12 +183,20 @@ note-app/
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_KEY` | Supabase anon/public key | Yes |
-| `FIREBASE_SERVICE_ACCOUNT` | Firebase service account JSON (single-line for Render) | Yes (production) |
-| `PORT` | Server port | No (default: 3001) |
+All Firebase configuration is now managed via environment variables for easy deployment on Render.
+
+| Variable | Description | Required | Where to Find |
+|----------|-------------|----------|---------------|
+| `SUPABASE_URL` | Supabase project URL | Yes | Supabase Dashboard → Project Settings → API |
+| `SUPABASE_KEY` | Supabase anon/public key | Yes | Supabase Dashboard → Project Settings → API |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase Admin SDK service account JSON (single-line) | Yes | Firebase Console → Project Settings → Service Accounts |
+| `FIREBASE_API_KEY` | Firebase web API key | Yes | Firebase Console → Project Settings → Your apps → Web app |
+| `FIREBASE_AUTH_DOMAIN` | Firebase auth domain | Yes | Firebase Console → Project Settings → Your apps → Web app |
+| `FIREBASE_PROJECT_ID` | Firebase project ID | Yes | Firebase Console → Project Settings → Your apps → Web app |
+| `FIREBASE_STORAGE_BUCKET` | Firebase storage bucket | Yes | Firebase Console → Project Settings → Your apps → Web app |
+| `FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID | Yes | Firebase Console → Project Settings → Your apps → Web app |
+| `FIREBASE_APP_ID` | Firebase app ID | Yes | Firebase Console → Project Settings → Your apps → Web app |
+| `PORT` | Server port | No | Default: 3001 |
 
 ## Security
 

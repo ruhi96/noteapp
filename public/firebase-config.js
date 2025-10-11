@@ -1,17 +1,30 @@
 // Firebase Configuration
-// Replace these with your Firebase project credentials
+// Fetched from backend environment variables
 
-const firebaseConfig = {
-    apiKey: "YOUR_FIREBASE_API_KEY",
-    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
+let auth;
+let googleProvider;
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const googleProvider = new firebase.auth.GoogleAuthProvider();
+// Fetch Firebase config from backend and initialize
+async function initializeFirebase() {
+    try {
+        const response = await fetch('/api/config/firebase');
+        const firebaseConfig = await response.json();
+        
+        // Initialize Firebase with config from backend
+        firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+        googleProvider = new firebase.auth.GoogleAuthProvider();
+        
+        console.log('Firebase initialized successfully');
+        
+        // Dispatch custom event to notify app that Firebase is ready
+        window.dispatchEvent(new Event('firebaseReady'));
+    } catch (error) {
+        console.error('Failed to initialize Firebase:', error);
+        alert('Failed to load authentication. Please refresh the page.');
+    }
+}
+
+// Initialize Firebase when script loads
+initializeFirebase();
 

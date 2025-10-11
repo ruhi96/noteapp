@@ -9,7 +9,7 @@ class NoteApp {
     }
 
     async init() {
-        // Wait for Firebase to initialize
+        // Wait for Firebase to initialize from backend config
         await this.waitForFirebase();
         
         // Set up auth state observer
@@ -28,10 +28,11 @@ class NoteApp {
 
     waitForFirebase() {
         return new Promise((resolve) => {
-            if (typeof firebase !== 'undefined' && typeof auth !== 'undefined') {
+            if (typeof firebase !== 'undefined' && typeof auth !== 'undefined' && auth !== null) {
                 resolve();
             } else {
-                setTimeout(() => resolve(this.waitForFirebase()), 100);
+                // Listen for firebaseReady event
+                window.addEventListener('firebaseReady', () => resolve(), { once: true });
             }
         });
     }
