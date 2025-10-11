@@ -76,6 +76,7 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseStorageEndpoint = process.env.SUPABASE_STORAGE_ENDPOINT;
 const dodoPaymentsApiKey = process.env.DODO_PAYMENTS_API_KEY;
 const dodoProductId = process.env.DODO_PRODUCT_ID;
+const googleAnalyticsId = process.env.GOOGLE_ANALYTICS_ID;
 
 console.log('📦 Supabase Configuration:');
 console.log('   URL:', supabaseUrl);
@@ -84,6 +85,7 @@ console.log('   Service Key:', supabaseServiceKey ? '✓ Set' : '❌ Missing');
 console.log('   Storage Endpoint:', supabaseStorageEndpoint);
 console.log('💳 DODO Payments API Key:', dodoPaymentsApiKey ? '✓ Set' : '❌ Missing');
 console.log('💳 DODO Product ID:', dodoProductId ? '✓ Set' : '❌ Missing');
+console.log('📊 Google Analytics ID:', googleAnalyticsId ? '✓ Set' : '❌ Missing');
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
@@ -185,6 +187,16 @@ app.get('/api/config/dodo', (req, res) => {
     }
     
     res.json(dodoConfig);
+});
+
+// Get Google Analytics configuration for frontend
+app.get('/api/config/analytics', (req, res) => {
+    const analyticsConfig = {
+        trackingId: googleAnalyticsId
+    };
+    
+    // Return config even if tracking ID is not set (for development)
+    res.json(analyticsConfig);
 });
 
 // Create DODO Payments checkout session

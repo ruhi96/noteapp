@@ -6,6 +6,7 @@ class NoteApp {
         this.currentUser = null;
         this.authToken = null;
         this.dodoProductId = null;
+        this.googleAnalyticsId = null;
         this.init();
     }
 
@@ -27,6 +28,9 @@ class NoteApp {
         
         // Load DODO Payments configuration
         await this.loadDodoConfig();
+        
+        // Load Google Analytics configuration and initialize
+        await this.loadAnalyticsConfig();
         
         // Handle payment redirects
         this.handlePaymentRedirects();
@@ -111,6 +115,12 @@ class NoteApp {
         
         // Initialize app components
         this.initializeAppComponents();
+        
+        // Track user login
+        this.trackEvent('user_login', {
+            method: user.providerData[0]?.providerId || 'email',
+            user_id: user.uid
+        });
         
         // Load notes
         await this.loadNotes();
@@ -424,6 +434,13 @@ class NoteApp {
 
             console.log('✅ Note created with', attachments.length, 'attachment(s)');
 
+            // Track note creation
+            this.trackEvent('note_created', {
+                has_attachments: attachments.length > 0,
+                attachment_count: attachments.length,
+                user_id: this.currentUser.uid
+            });
+
             // Clear form
             this.noteTitle.value = '';
             this.noteContent.value = '';
@@ -556,16 +573,25 @@ class NoteApp {
             const newUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
             window.history.replaceState({}, document.title, newUrl);
             
-            // Show appropriate message
+            // Show appropriate message and track events
             switch (paymentStatus) {
                 case 'success':
                     this.showSuccessMessage('🎉 Welcome to Premium! Your subscription is now active.');
+                    this.trackEvent('premium_upgrade_completed', {
+                        user_id: this.currentUser?.uid
+                    });
                     break;
                 case 'cancelled':
                     this.showErrorMessage('Payment was cancelled. You can try again anytime.');
+                    this.trackEvent('premium_upgrade_cancelled', {
+                        user_id: this.currentUser?.uid
+                    });
                     break;
                 case 'error':
                     this.showErrorMessage('Payment failed. Please try again or contact support.');
+                    this.trackEvent('premium_upgrade_failed', {
+                        user_id: this.currentUser?.uid
+                    });
                     break;
                 default:
                     this.showErrorMessage('Payment status unknown. Please check your account.');
@@ -634,6 +660,58 @@ class NoteApp {
         }
     }
 
+    async loadAnalyticsConfig() {
+        try {
+            const response = await fetch('/api/config/analytics');
+            if (!response.ok) {
+                console.warn('⚠️ Failed to load Google Analytics configuration');
+                return;
+            }
+            
+            const analyticsConfig = await response.json();
+            this.googleAnalyticsId = analyticsConfig.trackingId;
+            
+            if (this.googleAnalyticsId) {
+                console.log('✅ Google Analytics configuration loaded:', this.googleAnalyticsId);
+                this.initializeGoogleAnalytics();
+            } else {
+                console.log('📊 Google Analytics not configured (tracking ID missing)');
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to load Google Analytics configuration:', error);
+        }
+    }
+
+    initializeGoogleAnalytics() {
+        if (!this.googleAnalyticsId) return;
+
+        // Load Google Analytics script
+        const script = document.createElement('script');
+        script.async = true;
+        script.src = `https://www.googletagmanager.com/gtag/js?id=${this.googleAnalyticsId}`;
+        document.head.appendChild(script);
+
+        // Initialize gtag
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', this.googleAnalyticsId);
+
+        // Make gtag globally available
+        window.gtag = gtag;
+
+        console.log('📊 Google Analytics initialized with tracking ID:', this.googleAnalyticsId);
+    }
+
+    // Track custom events
+    trackEvent(eventName, parameters = {}) {
+        if (window.gtag && this.googleAnalyticsId) {
+            window.gtag('event', eventName, parameters);
+            console.log('📊 GA Event tracked:', eventName, parameters);
+        }
+    }
+
     async upgradeToPremium() {
         try {
             const upgradeBtn = document.getElementById('upgradePremiumBtn');
@@ -673,6 +751,13 @@ class NoteApp {
             
             console.log('✅ Checkout session created:', checkoutData.session_id);
             console.log('🔗 Redirecting to checkout URL:', checkoutData.checkout_url);
+            
+            // Track premium upgrade initiation
+            this.trackEvent('premium_upgrade_started', {
+                product_id: this.dodoProductId,
+                session_id: checkoutData.session_id,
+                user_id: this.currentUser.uid
+            });
             
             // Redirect to DODO Payments checkout
             window.location.href = checkoutData.checkout_url;
