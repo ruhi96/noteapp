@@ -1,28 +1,28 @@
-# Note App - Full Stack JavaScript with Supabase
+# Note App - Full Stack with Firebase Auth + Supabase
 
-A simple note-taking app with **Node.js/Express backend**, **Supabase database**, and **vanilla JavaScript frontend**. Deployable to Render.
+A secure note-taking app with **Firebase Google Authentication**, **Node.js/Express backend**, **Supabase database**, and **vanilla JavaScript frontend**. Deployable to Render.
 
 ## Tech Stack
 
 **Backend:**
-- Node.js
-- Express.js
-- Supabase (PostgreSQL)
+- Node.js + Express.js
+- Firebase Admin SDK (Authentication)
+- Supabase (PostgreSQL Database)
 
 **Frontend:**
-- HTML5
-- CSS3
-- Vanilla JavaScript
+- HTML5, CSS3, Vanilla JavaScript
+- Firebase Auth SDK
 
 **Deployment:**
 - Render
 
 ## Features
 
-- ✍️ Create notes with title and content
-- 📖 Read all saved notes
+- 🔐 Google Sign-in with Firebase Auth
+- ✍️ Create and read notes
+- 👤 User-specific notes (each user sees only their notes)
 - 💾 Persistent storage with Supabase
-- 🚀 RESTful API
+- 🚀 RESTful API with JWT verification
 - 🎨 Modern, responsive UI
 - ☁️ Deploy to Render
 
@@ -33,44 +33,42 @@ A simple note-taking app with **Node.js/Express backend**, **Supabase database**
 ```bash
 git clone https://github.com/ruhi96/noteapp.git
 cd noteapp
-```
-
-### 2. Install Dependencies
-
-```bash
 npm install
 ```
 
-### 3. Set Up Supabase
+### 2. Set Up Firebase
 
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. In the SQL Editor, run the schema from `supabase-schema.sql`:
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project or use existing
+3. Enable **Authentication** → **Google Sign-in**
+4. Get Web App Config:
+   - Project Settings → Your apps → Web app
+   - Copy the config object
+5. Update `public/firebase-config.js` with your config:
 
-```sql
-CREATE TABLE IF NOT EXISTS notes (
-    id BIGSERIAL PRIMARY KEY,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Enable all access for notes" ON notes
-    FOR ALL
-    USING (true)
-    WITH CHECK (true);
-
-CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
+```javascript
+const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+};
 ```
 
-3. Get your Supabase credentials:
-   - Go to Project Settings → API
-   - Copy the **Project URL** and **anon/public key**
+6. Generate Service Account Key:
+   - Project Settings → Service Accounts
+   - Click "Generate New Private Key"
+   - Save as `firebase-service-account.json` in project root
+
+### 3. Set Up Supabase
+
+1. Go to [supabase.com](https://supabase.com) and create a project
+2. In SQL Editor, run the schema from `supabase-schema.sql`
+3. Get credentials from Project Settings → API
 
 ### 4. Configure Environment Variables
-
-Copy `.env.example` to `.env` and add your Supabase credentials:
 
 ```bash
 cp .env.example .env
@@ -89,86 +87,147 @@ PORT=3001
 npm start
 ```
 
-Open browser to: **http://localhost:3001**
+Open browser: **http://localhost:3001**
 
 ## Deploy to Render
 
-### Option 1: Using render.yaml (Recommended)
+### Step 1: Prepare Firebase Service Account
 
-1. Push your code to GitHub
+Convert your `firebase-service-account.json` to a single-line string:
+
+```bash
+# On Linux/Mac:
+cat firebase-service-account.json | jq -c
+
+# On Windows PowerShell:
+Get-Content firebase-service-account.json | ConvertFrom-Json | ConvertTo-Json -Compress
+```
+
+### Step 2: Deploy to Render
+
+#### Option A: Using render.yaml (Automatic)
+
+1. Push code to GitHub
 2. Go to [Render Dashboard](https://dashboard.render.com/)
-3. Click **New** → **Blueprint**
-4. Connect your GitHub repository
-5. Render will automatically detect `render.yaml`
-6. Add environment variables:
+3. New → Blueprint
+4. Connect your GitHub repo
+5. Add environment variables:
    - `SUPABASE_URL`: Your Supabase project URL
    - `SUPABASE_KEY`: Your Supabase anon key
-7. Click **Apply**
+   - `FIREBASE_SERVICE_ACCOUNT`: Single-line JSON string from Step 1
+6. Click **Apply**
 
-### Option 2: Manual Setup
+#### Option B: Manual Setup
 
 1. Go to [Render Dashboard](https://dashboard.render.com/)
-2. Click **New** → **Web Service**
-3. Connect your GitHub repository
+2. New → Web Service
+3. Connect GitHub repository
 4. Configure:
    - **Name**: note-app
    - **Environment**: Node
    - **Build Command**: `npm install`
    - **Start Command**: `npm start`
-5. Add environment variables:
-   - `SUPABASE_URL`: Your Supabase project URL
-   - `SUPABASE_KEY`: Your Supabase anon key
-6. Click **Create Web Service**
+5. Add environment variables (same as Option A)
+6. Create Web Service
 
 Your app will be live at: `https://your-app-name.onrender.com`
 
+### Step 3: Update Firebase Auth Domain
+
+Add your Render URL to Firebase:
+1. Firebase Console → Authentication → Settings
+2. Authorized domains → Add domain
+3. Add: `your-app-name.onrender.com`
+
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/notes` | Get all notes |
-| POST | `/api/notes` | Create a new note |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/notes` | Required | Get user's notes |
+| POST | `/api/notes` | Required | Create new note |
 
 ### Example Request
 
 ```bash
+# Get auth token from Firebase
+TOKEN="your_firebase_id_token"
+
 # Create a note
-curl -X POST http://localhost:3001/api/notes \
+curl -X POST https://your-app.onrender.com/api/notes \
   -H "Content-Type: application/json" \
-  -d '{"title":"My Note","content":"This is my note content"}'
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"title":"My Note","content":"Note content"}'
 
 # Get all notes
-curl http://localhost:3001/api/notes
+curl https://your-app.onrender.com/api/notes \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Project Structure
 
 ```
 note-app/
-├── server.js              # Express backend with Supabase
-├── package.json           # Dependencies
-├── .env                   # Environment variables (not in git)
-├── .env.example           # Environment variables template
-├── render.yaml            # Render deployment config
-├── supabase-schema.sql    # Database schema
+├── server.js                          # Express backend with auth
+├── package.json                       # Dependencies
+├── .env                               # Environment variables (not in git)
+├── .env.example                       # Environment template
+├── firebase-service-account.json      # Firebase admin key (not in git)
+├── firebase-service-account.example.json  # Template
+├── render.yaml                        # Render deployment config
+├── supabase-schema.sql               # Database schema with user_id
 ├── public/
-│   ├── index.html        # Frontend HTML
-│   ├── styles.css        # Styling
-│   └── app.js            # Frontend JavaScript
-└── README.md             # Documentation
+│   ├── index.html                    # Frontend with auth UI
+│   ├── styles.css                    # Styling with auth screens
+│   ├── app.js                        # Frontend JS with auth logic
+│   └── firebase-config.js            # Firebase client config
+└── README.md                         # Documentation
 ```
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `SUPABASE_URL` | Your Supabase project URL |
-| `SUPABASE_KEY` | Your Supabase anon/public key |
-| `PORT` | Server port (default: 3001) |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `SUPABASE_URL` | Supabase project URL | Yes |
+| `SUPABASE_KEY` | Supabase anon/public key | Yes |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase service account JSON (single-line for Render) | Yes (production) |
+| `PORT` | Server port | No (default: 3001) |
 
-## Contributing
+## Security
 
-Feel free to fork and submit pull requests!
+- ✅ Firebase JWT token verification on backend
+- ✅ User-specific data filtering
+- ✅ Supabase Row Level Security
+- ✅ Environment variables for secrets
+- ✅ HTTPS on Render deployment
+
+## Database Schema
+
+The `notes` table includes:
+- `id`: Primary key
+- `title`: Note title
+- `content`: Note content
+- `user_id`: Firebase user UID
+- `user_email`: User email (optional)
+- `created_at`: Timestamp
+
+Each user can only access their own notes.
+
+## Troubleshooting
+
+### Firebase Auth Error
+- Check Firebase config in `firebase-config.js`
+- Verify authorized domains in Firebase Console
+- Ensure service account JSON is valid
+
+### Supabase Connection Error
+- Verify SUPABASE_URL and SUPABASE_KEY
+- Check if schema is properly set up
+- Ensure RLS policies allow backend operations
+
+### Render Deployment Error
+- Check environment variables are set correctly
+- Verify FIREBASE_SERVICE_ACCOUNT is single-line JSON
+- Check Render logs for specific errors
 
 ## License
 

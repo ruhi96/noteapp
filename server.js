@@ -3,9 +3,19 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const admin = require('firebase-admin');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Initialize Firebase Admin
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : require('./firebase-service-account.json');
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+});
 
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -17,14 +27,40 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// Auth middleware
+async function authenticateUser(req, res, next) {
+    try {
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        
+        const token = authHeader.split('Bearer ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        
+        req.user = {
+            uid: decodedToken.uid,
+            email: decodedToken.email,
+            name: decodedToken.name
+        };
+        
+        next();
+    } catch (error) {
+        console.error('Auth error:', error);
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+}
+
 // API Routes
 
-// Get all notes
-app.get('/api/notes', async (req, res) => {
+// Get all notes for authenticated user
+app.get('/api/notes', authenticateUser, async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('notes')
             .select('*')
+            .eq('user_id', req.user.uid)
             .order('created_at', { ascending: false });
         
         if (error) throw error;
@@ -36,8 +72,8 @@ app.get('/api/notes', async (req, res) => {
     }
 });
 
-// Create a new note
-app.post('/api/notes', async (req, res) => {
+// Create a new note for authenticated user
+app.post('/api/notes', authenticateUser, async (req, res) => {
     try {
         const { title, content } = req.body;
         
@@ -47,7 +83,12 @@ app.post('/api/notes', async (req, res) => {
         
         const { data, error } = await supabase
             .from('notes')
-            .insert([{ title, content }])
+            .insert([{ 
+                title, 
+                content, 
+                user_id: req.user.uid,
+                user_email: req.user.email 
+            }])
             .select()
             .single();
         

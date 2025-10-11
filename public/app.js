@@ -1,12 +1,92 @@
-// Note App - Frontend JavaScript with API calls
+// Note App - Frontend JavaScript with Firebase Auth and API calls
 
 class NoteApp {
     constructor() {
         this.apiUrl = '/api/notes';
+        this.currentUser = null;
+        this.authToken = null;
         this.init();
     }
 
     async init() {
+        // Wait for Firebase to initialize
+        await this.waitForFirebase();
+        
+        // Set up auth state observer
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                await this.handleAuthenticatedUser(user);
+            } else {
+                this.showAuthScreen();
+            }
+        });
+
+        // Set up auth button listeners
+        document.getElementById('googleSignIn').addEventListener('click', () => this.signInWithGoogle());
+        document.getElementById('signOutBtn').addEventListener('click', () => this.signOut());
+    }
+
+    waitForFirebase() {
+        return new Promise((resolve) => {
+            if (typeof firebase !== 'undefined' && typeof auth !== 'undefined') {
+                resolve();
+            } else {
+                setTimeout(() => resolve(this.waitForFirebase()), 100);
+            }
+        });
+    }
+
+    async handleAuthenticatedUser(user) {
+        this.currentUser = user;
+        
+        // Get the ID token
+        this.authToken = await user.getIdToken();
+        
+        // Show app screen
+        this.showAppScreen();
+        
+        // Display user info
+        document.getElementById('userName').textContent = user.displayName || 'User';
+        document.getElementById('userPhoto').src = user.photoURL || '';
+        
+        // Initialize app components
+        this.initializeAppComponents();
+        
+        // Load notes
+        await this.loadNotes();
+    }
+
+    showAuthScreen() {
+        document.getElementById('authScreen').style.display = 'flex';
+        document.getElementById('appScreen').style.display = 'none';
+    }
+
+    showAppScreen() {
+        document.getElementById('authScreen').style.display = 'none';
+        document.getElementById('appScreen').style.display = 'block';
+    }
+
+    async signInWithGoogle() {
+        try {
+            await auth.signInWithPopup(googleProvider);
+        } catch (error) {
+            console.error('Error signing in:', error);
+            alert('Failed to sign in. Please try again.');
+        }
+    }
+
+    async signOut() {
+        try {
+            await auth.signOut();
+            this.currentUser = null;
+            this.authToken = null;
+        } catch (error) {
+            console.error('Error signing out:', error);
+            alert('Failed to sign out. Please try again.');
+        }
+    }
+
+    initializeAppComponents() {
         // Get DOM elements
         this.noteTitle = document.getElementById('noteTitle');
         this.noteContent = document.getElementById('noteContent');
@@ -23,9 +103,6 @@ class NoteApp {
                 this.noteContent.focus();
             }
         });
-
-        // Load and display existing notes
-        await this.loadNotes();
     }
 
     async createNote() {
@@ -39,11 +116,15 @@ class NoteApp {
         }
 
         try {
-            // Send POST request to backend
+            // Refresh token if needed
+            this.authToken = await this.currentUser.getIdToken();
+
+            // Send POST request to backend with auth token
             const response = await fetch(this.apiUrl, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.authToken}`
                 },
                 body: JSON.stringify({ title, content })
             });
@@ -67,8 +148,15 @@ class NoteApp {
 
     async loadNotes() {
         try {
-            // Fetch notes from backend
-            const response = await fetch(this.apiUrl);
+            // Refresh token if needed
+            this.authToken = await this.currentUser.getIdToken();
+
+            // Fetch notes from backend with auth token
+            const response = await fetch(this.apiUrl, {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
             
             if (!response.ok) {
                 throw new Error('Failed to load notes');
@@ -142,4 +230,3 @@ class NoteApp {
 document.addEventListener('DOMContentLoaded', () => {
     new NoteApp();
 });
-
