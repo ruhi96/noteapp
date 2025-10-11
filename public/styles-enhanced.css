@@ -1,0 +1,675 @@
+/* Enhanced Note App Styles - File Attachments Support */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+/* Auth Screen Styles */
+.auth-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.auth-container {
+    background: white;
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.auth-container h1 {
+    margin-bottom: 10px;
+    color: #333;
+    font-size: 2rem;
+}
+
+.auth-container p {
+    color: #666;
+    margin-bottom: 30px;
+}
+
+.auth-tabs {
+    display: flex;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f5f5f5;
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.auth-tab.active {
+    background: #667eea;
+    color: white;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.auth-form input {
+    padding: 12px;
+    border: 2px solid #e1e1e1;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.auth-form input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.auth-btn {
+    padding: 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.auth-btn:hover {
+    background: #5a67d8;
+}
+
+.google-signin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px;
+    background: white;
+    color: #333;
+    border: 2px solid #e1e1e1;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.google-signin-btn:hover {
+    border-color: #667eea;
+    background: #f8f9ff;
+}
+
+.divider {
+    margin: 20px 0;
+    position: relative;
+    text-align: center;
+    color: #999;
+}
+
+.divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #e1e1e1;
+}
+
+.divider span {
+    background: white;
+    padding: 0 15px;
+}
+
+.error-message {
+    background: #fee;
+    color: #c53030;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #feb2b2;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+/* App Screen Styles */
+.app-screen {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.user-info-header {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.user-email {
+    color: #666;
+    font-size: 14px;
+}
+
+.sign-out-btn {
+    margin-left: auto;
+    padding: 8px 16px;
+    background: #e53e3e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
+
+.sign-out-btn:hover {
+    background: #c53030;
+}
+
+/* Note Form Styles */
+.note-form-container {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.note-form-container h2 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.note-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.note-form input,
+.note-form textarea {
+    padding: 12px;
+    border: 2px solid #e1e1e1;
+    border-radius: 8px;
+    font-size: 16px;
+    font-family: inherit;
+    transition: border-color 0.3s ease;
+}
+
+.note-form input:focus,
+.note-form textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.note-form textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* File Upload Styles */
+.file-upload-section {
+    border: 2px dashed #e1e1e1;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    transition: border-color 0.3s ease;
+}
+
+.file-upload-section:hover {
+    border-color: #667eea;
+}
+
+.upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.upload-btn:hover {
+    background: #5a67d8;
+}
+
+.selected-files {
+    margin-top: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.file-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f0f4ff;
+    border: 1px solid #667eea;
+    border-radius: 20px;
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+.file-icon {
+    font-size: 16px;
+}
+
+.file-name {
+    font-weight: 500;
+    color: #333;
+}
+
+.file-size {
+    color: #666;
+    font-size: 12px;
+}
+
+.remove-file {
+    background: #e53e3e;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s ease;
+}
+
+.remove-file:hover {
+    background: #c53030;
+}
+
+.add-note-btn {
+    padding: 15px 30px;
+    background: #48bb78;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.add-note-btn:hover {
+    background: #38a169;
+}
+
+.add-note-btn:disabled {
+    background: #a0aec0;
+    cursor: not-allowed;
+}
+
+/* Notes Container */
+.notes-container {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.notes-container h2 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.notes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.no-notes {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 40px;
+}
+
+/* Note Card Styles */
+.note-card {
+    background: #f8f9fa;
+    border: 1px solid #e1e1e1;
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.note-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.note-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.note-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333;
+    margin: 0;
+}
+
+.note-date {
+    color: #666;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.note-content {
+    color: #555;
+    line-height: 1.6;
+    margin-bottom: 15px;
+}
+
+/* File Attachments Styles */
+.note-attachments {
+    margin: 20px 0;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e1e1e1;
+}
+
+.note-attachments h4 {
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.attachment-item {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.attachment-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.attachment-icon {
+    font-size: 20px;
+}
+
+.attachment-name {
+    font-weight: 500;
+    color: #333;
+    flex: 1;
+}
+
+.attachment-size {
+    color: #666;
+    font-size: 12px;
+}
+
+.attachment-preview {
+    margin: 10px 0;
+}
+
+.attachment-image {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.attachment-image:hover {
+    transform: scale(1.02);
+}
+
+.attachment-video {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 6px;
+}
+
+.attachment-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.download-btn,
+.delete-attachment-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.3s ease;
+}
+
+.download-btn {
+    background: #4299e1;
+    color: white;
+}
+
+.download-btn:hover {
+    background: #3182ce;
+}
+
+.delete-attachment-btn {
+    background: #e53e3e;
+    color: white;
+}
+
+.delete-attachment-btn:hover {
+    background: #c53030;
+}
+
+/* Note Actions */
+.note-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e1e1e1;
+}
+
+.delete-btn {
+    padding: 8px 16px;
+    background: #e53e3e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease;
+}
+
+.delete-btn:hover {
+    background: #c53030;
+}
+
+/* Image Modal */
+.image-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    position: relative;
+    max-width: 90%;
+    max-height: 90%;
+}
+
+.modal-close {
+    position: absolute;
+    top: -40px;
+    right: 0;
+    color: white;
+    font-size: 30px;
+    cursor: pointer;
+    z-index: 1001;
+}
+
+.modal-image {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+}
+
+.modal-caption {
+    position: absolute;
+    bottom: -30px;
+    left: 0;
+    right: 0;
+    color: white;
+    text-align: center;
+    font-size: 14px;
+}
+
+/* Loading Indicator */
+.loading-indicator {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    z-index: 1000;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #e1e1e1;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .app-screen {
+        padding: 15px;
+    }
+    
+    .note-form-container,
+    .notes-container {
+        padding: 20px;
+    }
+    
+    .notes-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .user-info {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .sign-out-btn {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+    
+    .attachment-actions {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-container {
+        padding: 30px 20px;
+    }
+    
+    .note-form-container,
+    .notes-container {
+        padding: 15px;
+    }
+    
+    .selected-files {
+        flex-direction: column;
+    }
+    
+    .file-chip {
+        justify-content: space-between;
+    }
+}

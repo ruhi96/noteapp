@@ -72,13 +72,17 @@ try {
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseStorageEndpoint = process.env.SUPABASE_STORAGE_ENDPOINT;
 
 console.log('📦 Supabase Configuration:');
 console.log('   URL:', supabaseUrl);
+console.log('   Anon Key:', supabaseKey ? '✓ Set' : '❌ Missing');
+console.log('   Service Key:', supabaseServiceKey ? '✓ Set' : '❌ Missing');
 console.log('   Storage Endpoint:', supabaseStorageEndpoint);
 
 const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
 // Middleware
 app.use(cors());
@@ -138,6 +142,27 @@ app.get('/api/config/firebase', (req, res) => {
     }
     
     res.json(firebaseConfig);
+});
+
+// Get Supabase configuration for frontend
+app.get('/api/config/supabase', (req, res) => {
+    const supabaseConfig = {
+        url: supabaseUrl,
+        anonKey: supabaseKey,
+        serviceKey: supabaseServiceKey,
+        storageEndpoint: supabaseStorageEndpoint
+    };
+    
+    // Validate required fields
+    if (!supabaseConfig.url || !supabaseConfig.anonKey || !supabaseConfig.serviceKey) {
+        console.error('❌ Missing required Supabase configuration!');
+        console.error('   Required: SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_ROLE_KEY');
+        return res.status(500).json({ 
+            error: 'Supabase configuration incomplete. Please contact administrator.' 
+        });
+    }
+    
+    res.json(supabaseConfig);
 });
 
 // Get all notes for authenticated user
