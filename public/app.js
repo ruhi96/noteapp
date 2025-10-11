@@ -111,7 +111,9 @@ class NoteApp {
         const card = document.createElement('div');
         card.className = 'note-card';
         
-        const date = new Date(note.createdAt);
+        // Handle both camelCase (old) and snake_case (Supabase) field names
+        const dateString = note.created_at || note.createdAt;
+        const date = new Date(dateString);
         const formattedDate = date.toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'short',
