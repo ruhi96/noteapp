@@ -9,9 +9,25 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Initialize Firebase Admin
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
-    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-    : require('./firebase-service-account.json');
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // Production: Use environment variable (JSON string)
+    try {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (error) {
+        console.error('Error parsing FIREBASE_SERVICE_ACCOUNT:', error);
+        throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT environment variable. Must be valid JSON.');
+    }
+} else {
+    // Development: Try to load from local file
+    try {
+        serviceAccount = require('./firebase-service-account.json');
+    } catch (error) {
+        console.error('Firebase service account not found. Please set FIREBASE_SERVICE_ACCOUNT environment variable or create firebase-service-account.json file.');
+        throw new Error('Firebase Admin SDK initialization failed: No service account credentials found.');
+    }
+}
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
