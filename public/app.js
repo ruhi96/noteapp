@@ -5,6 +5,7 @@ class NoteApp {
         this.apiUrl = '/api/notes';
         this.currentUser = null;
         this.authToken = null;
+        this.dodoProductId = null;
         this.init();
     }
 
@@ -23,6 +24,9 @@ class NoteApp {
 
         // Set up auth screen listeners
         this.setupAuthListeners();
+        
+        // Load DODO Payments configuration
+        await this.loadDodoConfig();
         
         // Handle payment redirects
         this.handlePaymentRedirects();
@@ -613,6 +617,23 @@ class NoteApp {
         }, 7000);
     }
 
+    async loadDodoConfig() {
+        try {
+            const response = await fetch('/api/config/dodo');
+            if (!response.ok) {
+                console.warn('⚠️ Failed to load DODO Payments configuration');
+                return;
+            }
+            
+            const dodoConfig = await response.json();
+            this.dodoProductId = dodoConfig.productId;
+            console.log('✅ DODO Payments configuration loaded:', this.dodoProductId);
+            
+        } catch (error) {
+            console.error('❌ Failed to load DODO Payments configuration:', error);
+        }
+    }
+
     async upgradeToPremium() {
         try {
             const upgradeBtn = document.getElementById('upgradePremiumBtn');
@@ -624,6 +645,13 @@ class NoteApp {
             
             console.log('💳 Starting premium upgrade for user:', this.currentUser.email);
             
+            // Check if product ID is loaded
+            if (!this.dodoProductId) {
+                throw new Error('Payment configuration not loaded. Please refresh the page and try again.');
+            }
+            
+            console.log('📦 Using product ID:', this.dodoProductId);
+            
             // Create checkout session
             const response = await fetch('/api/payments/create-checkout', {
                 method: 'POST',
@@ -632,7 +660,7 @@ class NoteApp {
                     'Authorization': `Bearer ${this.authToken}`
                 },
                 body: JSON.stringify({
-                    productId: 'prod_123' // Replace with your actual product ID from DODO Payments
+                    productId: this.dodoProductId
                 })
             });
 

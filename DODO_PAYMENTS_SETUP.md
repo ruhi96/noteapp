@@ -36,11 +36,13 @@ Add to your `.env` file:
 ```env
 # DODO Payments Configuration
 DODO_PAYMENTS_API_KEY=your_actual_dodo_payments_api_key
+DODO_PRODUCT_ID=your_actual_dodo_product_id
 ```
 
 **For Render Deployment:**
 - Go to Render Dashboard → Your Service → Environment
 - Add: `DODO_PAYMENTS_API_KEY` = `your_actual_dodo_payments_api_key`
+- Add: `DODO_PRODUCT_ID` = `your_actual_dodo_product_id`
 
 ### 3. Create Payment Sessions Table
 
@@ -88,14 +90,9 @@ TO authenticated
 USING (auth.role() = 'authenticated');
 ```
 
-### 4. Update Product ID
+### 4. Product ID Configuration
 
-In `public/app.js`, find this line:
-```javascript
-productId: 'prod_123' // Replace with your actual product ID from DODO Payments
-```
-
-Replace `'prod_123'` with your actual DODO Payments product ID.
+The product ID is now automatically loaded from the `DODO_PRODUCT_ID` environment variable. No code changes needed!
 
 ### 5. Test the Integration
 
@@ -237,7 +234,7 @@ ORDER BY date DESC;
 ## 🚀 Deployment Checklist
 
 - [ ] DODO Payments API key added to environment variables
-- [ ] Product ID updated in frontend code
+- [ ] DODO Product ID added to environment variables
 - [ ] Payment sessions table created in Supabase
 - [ ] RLS policies applied to payment_sessions table
 - [ ] Backend deployed with new payment endpoints

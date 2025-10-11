@@ -75,6 +75,7 @@ const supabaseKey = process.env.SUPABASE_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseStorageEndpoint = process.env.SUPABASE_STORAGE_ENDPOINT;
 const dodoPaymentsApiKey = process.env.DODO_PAYMENTS_API_KEY;
+const dodoProductId = process.env.DODO_PRODUCT_ID;
 
 console.log('📦 Supabase Configuration:');
 console.log('   URL:', supabaseUrl);
@@ -82,6 +83,7 @@ console.log('   Anon Key:', supabaseKey ? '✓ Set' : '❌ Missing');
 console.log('   Service Key:', supabaseServiceKey ? '✓ Set' : '❌ Missing');
 console.log('   Storage Endpoint:', supabaseStorageEndpoint);
 console.log('💳 DODO Payments API Key:', dodoPaymentsApiKey ? '✓ Set' : '❌ Missing');
+console.log('💳 DODO Product ID:', dodoProductId ? '✓ Set' : '❌ Missing');
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
@@ -167,13 +169,34 @@ app.get('/api/config/supabase', (req, res) => {
     res.json(supabaseConfig);
 });
 
+// Get DODO Payments configuration for frontend
+app.get('/api/config/dodo', (req, res) => {
+    const dodoConfig = {
+        productId: dodoProductId
+    };
+    
+    // Validate required fields
+    if (!dodoConfig.productId) {
+        console.error('❌ Missing required DODO Payments configuration!');
+        console.error('   Required: DODO_PRODUCT_ID');
+        return res.status(500).json({ 
+            error: 'DODO Payments configuration incomplete. Please contact administrator.' 
+        });
+    }
+    
+    res.json(dodoConfig);
+});
+
 // Create DODO Payments checkout session
 app.post('/api/payments/create-checkout', authenticateUser, async (req, res) => {
     try {
         const { productId } = req.body;
         
-        if (!productId) {
-            return res.status(400).json({ error: 'Product ID is required' });
+        // Use productId from request body, or fall back to environment variable
+        const finalProductId = productId || dodoProductId;
+        
+        if (!finalProductId) {
+            return res.status(400).json({ error: 'Product ID is required. Please provide in request body or set DODO_PRODUCT_ID environment variable.' });
         }
 
         if (!dodoPaymentsApiKey) {
@@ -182,7 +205,7 @@ app.post('/api/payments/create-checkout', authenticateUser, async (req, res) => 
         }
 
         console.log('💳 Creating checkout session for user:', req.user.email);
-        console.log('   Product ID:', productId);
+        console.log('   Product ID:', finalProductId);
 
         // Prepare customer information from Firebase user
         const customer = {
@@ -204,7 +227,7 @@ app.post('/api/payments/create-checkout', authenticateUser, async (req, res) => 
         const checkoutData = {
             product_cart: [
                 {
-                    product_id: productId,
+                    product_id: finalProductId,
                     quantity: 1
                 }
             ],
@@ -252,7 +275,7 @@ app.post('/api/payments/create-checkout', authenticateUser, async (req, res) => 
                     user_id: req.user.uid,
                     user_email: req.user.email,
                     session_id: session.session_id,
-                    product_id: productId,
+                    product_id: finalProductId,
                     checkout_url: session.checkout_url,
                     status: 'created',
                     created_at: new Date().toISOString()
