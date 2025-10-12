@@ -138,9 +138,13 @@ BEGIN
             subscription_status = new_status,
             is_active = (new_status = 'premium'),
             updated_at = NOW()
-        WHERE user_id = user_uid
-        ORDER BY created_at DESC
-        LIMIT 1;
+        WHERE id = (
+            SELECT id 
+            FROM user_subscriptions 
+            WHERE user_id = user_uid
+            ORDER BY created_at DESC
+            LIMIT 1
+        );
         GET DIAGNOSTICS updated_rows = ROW_COUNT;
     END IF;
     
