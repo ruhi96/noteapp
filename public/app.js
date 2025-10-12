@@ -37,6 +37,9 @@ class NoteApp {
         
         // Handle payment redirects
         this.handlePaymentRedirects();
+        
+        // Set up periodic subscription status check (every 30 seconds)
+        this.setupPeriodicSubscriptionCheck();
     }
 
     setupAuthListeners() {
@@ -56,6 +59,12 @@ class NoteApp {
         
         // Premium upgrade
         document.getElementById('upgradePremiumBtn').addEventListener('click', () => this.upgradeToPremium());
+        
+        // Add refresh subscription status button (if exists)
+        const refreshBtn = document.getElementById('refreshSubscriptionBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.loadUserSubscriptionStatus());
+        }
         
         // Enter key handlers
         document.getElementById('loginPassword').addEventListener('keypress', (e) => {
@@ -583,10 +592,8 @@ class NoteApp {
                     this.trackEvent('premium_upgrade_completed', {
                         user_id: this.currentUser?.uid
                     });
-                    // Reload subscription status after successful payment
-                    setTimeout(() => {
-                        this.loadUserSubscriptionStatus();
-                    }, 2000);
+                    // Reload subscription status after successful payment with retry mechanism
+                    this.waitForSubscriptionActivation();
                     break;
                 case 'cancelled':
                     this.showErrorMessage('Payment was cancelled. You can try again anytime.');
@@ -674,6 +681,8 @@ class NoteApp {
                 return;
             }
 
+            console.log('📊 Checking subscription status...');
+            
             const response = await fetch('/api/user/subscription-status', {
                 headers: {
                     'Authorization': `Bearer ${this.authToken}`
@@ -689,32 +698,110 @@ class NoteApp {
             this.userSubscription = subscriptionData;
             
             console.log('✅ User subscription status loaded:', subscriptionData.status);
+            console.log('📊 Subscription data:', subscriptionData);
             
             // Update UI based on subscription status
             this.updatePremiumButton();
             
+            return subscriptionData;
+            
         } catch (error) {
             console.error('❌ Failed to load user subscription status:', error);
+            return null;
         }
+    }
+
+    async waitForSubscriptionActivation() {
+        console.log('⏳ Waiting for subscription activation...');
+        
+        let attempts = 0;
+        const maxAttempts = 10;
+        const delayMs = 3000; // 3 seconds between attempts
+        
+        const checkSubscription = async () => {
+            attempts++;
+            console.log(`🔄 Checking subscription status (attempt ${attempts}/${maxAttempts})`);
+            
+            const subscriptionData = await this.loadUserSubscriptionStatus();
+            
+            if (subscriptionData && subscriptionData.isPremium) {
+                console.log('🎉 Subscription is now active! Button should update.');
+                // Show additional success message
+                this.showSuccessMessage('✨ Premium features are now unlocked!');
+                return true;
+            }
+            
+            if (attempts < maxAttempts) {
+                console.log(`⏳ Subscription not yet active, retrying in ${delayMs/1000} seconds...`);
+                setTimeout(checkSubscription, delayMs);
+            } else {
+                console.log('⚠️ Subscription activation timeout - please refresh the page');
+                this.showErrorMessage('Subscription activated but page needs refresh. Please refresh to see changes.');
+            }
+            
+            return false;
+        };
+        
+        // Start checking after initial delay
+        setTimeout(checkSubscription, 2000);
+    }
+
+    setupPeriodicSubscriptionCheck() {
+        // Only check if user is authenticated and not premium yet
+        if (!this.currentUser || (this.userSubscription && this.userSubscription.isPremium)) {
+            return;
+        }
+        
+        console.log('⏰ Setting up periodic subscription status check');
+        
+        // Check subscription status every 30 seconds
+        this.subscriptionCheckInterval = setInterval(async () => {
+            if (this.currentUser && (!this.userSubscription || !this.userSubscription.isPremium)) {
+                console.log('🔄 Periodic subscription status check...');
+                await this.loadUserSubscriptionStatus();
+            } else {
+                // User is premium, stop checking
+                if (this.subscriptionCheckInterval) {
+                    clearInterval(this.subscriptionCheckInterval);
+                    console.log('✅ Subscription active, stopping periodic checks');
+                }
+            }
+        }, 30000); // 30 seconds
     }
 
     updatePremiumButton() {
         const upgradeBtn = document.getElementById('upgradePremiumBtn');
-        if (!upgradeBtn) return;
+        if (!upgradeBtn) {
+            console.log('⚠️ Premium button not found in DOM');
+            return;
+        }
+
+        console.log('🔘 Updating premium button state...');
+        console.log('📊 Current subscription data:', this.userSubscription);
 
         if (this.userSubscription && this.userSubscription.isPremium) {
             // User is premium
+            console.log('👑 Setting button to PREMIUM state');
             upgradeBtn.textContent = '👑 Premium';
             upgradeBtn.disabled = true;
             upgradeBtn.classList.add('premium-active');
             upgradeBtn.title = 'You have an active Premium subscription';
+            
+            // Stop periodic checks since user is premium
+            if (this.subscriptionCheckInterval) {
+                clearInterval(this.subscriptionCheckInterval);
+                console.log('✅ Stopping periodic subscription checks');
+            }
         } else {
             // User is free
+            console.log('⭐ Setting button to FREE state');
             upgradeBtn.textContent = '⭐ Upgrade to Premium';
             upgradeBtn.disabled = false;
             upgradeBtn.classList.remove('premium-active');
             upgradeBtn.title = 'Upgrade to Premium for unlimited features';
         }
+        
+        console.log('🔘 Button updated:', upgradeBtn.textContent);
     }
 
     async loadAnalyticsConfig() {
