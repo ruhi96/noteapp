@@ -90,11 +90,30 @@ TO authenticated
 USING (auth.role() = 'authenticated');
 ```
 
-### 4. Product ID Configuration
+### 4. Configure Webhook (Optional but Recommended)
+
+For real-time subscription status updates, configure a webhook in DODO Payments:
+
+1. **Go to DODO Payments Dashboard → Webhooks**
+2. **Add webhook URL**: `https://noteapp-moei.onrender.com/api/payments/webhook`
+3. **Select events**:
+   - `payment.completed`
+   - `payment.failed`
+   - `payment.cancelled`
+   - `checkout.completed`
+   - `checkout.failed`
+   - `checkout.cancelled`
+4. **Copy webhook secret key** and add as `DODO_WEBHOOK_KEY` environment variable
+
+**For Render Deployment:**
+- Go to Render Dashboard → Your Service → Environment
+- Add: `DODO_WEBHOOK_KEY` = `your_webhook_secret_key`
+
+### 5. Product ID Configuration
 
 The product ID is now automatically loaded from the `DODO_PRODUCT_ID` environment variable. No code changes needed!
 
-### 5. Test the Integration
+### 6. Test the Integration
 
 1. **Deploy to Render** (or run locally)
 2. **Sign in to your app**
