@@ -391,6 +391,8 @@ async function handlePaymentCompleted(paymentData) {
         
         // Check if subscription_id already exists
         if (subscription_id) {
+            console.log('🔍 Checking if subscription_id exists:', subscription_id);
+            
             const { data: existingSubscription, error: checkError } = await supabase
                 .from('user_subscriptions')
                 .select('*')
@@ -399,6 +401,11 @@ async function handlePaymentCompleted(paymentData) {
             
             if (checkError && checkError.code !== 'PGRST116') {
                 console.error('❌ Error checking existing subscription:', checkError);
+                console.error('❌ Check error details:', JSON.stringify(checkError, null, 2));
+            } else if (checkError && checkError.code === 'PGRST116') {
+                console.log('✅ No existing subscription found (expected for new subscriptions)');
+            } else {
+                console.log('✅ Existing subscription found:', JSON.stringify(existingSubscription, null, 2));
             }
             
             if (existingSubscription) {
@@ -426,29 +433,37 @@ async function handlePaymentCompleted(paymentData) {
         
         // Create new subscription record
         console.log('📝 Creating new subscription record');
-        const { error: insertError } = await supabase
+        
+        const subscriptionRecord = {
+            user_id: userId,
+            user_email: userEmail,
+            subscription_status: 'premium',
+            subscription_type: 'premium',
+            product_id: metadata.product || metadata.product_id || dodoProductId,
+            session_id: checkout_session_id,
+            payment_id: payment_id,
+            subscription_id: subscription_id,
+            amount: total_amount ? (total_amount / 100) : null, // Convert from cents
+            currency: currency || 'USD',
+            subscription_start_date: new Date().toISOString(),
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        console.log('📊 Subscription record to insert:', JSON.stringify(subscriptionRecord, null, 2));
+        
+        const { data: insertData, error: insertError } = await supabase
             .from('user_subscriptions')
-            .insert([{
-                user_id: userId,
-                user_email: userEmail,
-                subscription_status: 'premium',
-                subscription_type: 'premium',
-                product_id: metadata.product || metadata.product_id || dodoProductId,
-                session_id: checkout_session_id,
-                payment_id: payment_id,
-                subscription_id: subscription_id,
-                amount: total_amount ? (total_amount / 100) : null, // Convert from cents
-                currency: currency || 'USD',
-                subscription_start_date: new Date().toISOString(),
-                is_active: true,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            }]);
+            .insert([subscriptionRecord])
+            .select();
         
         if (insertError) {
             console.error('❌ Failed to create subscription:', insertError);
+            console.error('❌ Error details:', JSON.stringify(insertError, null, 2));
         } else {
-            console.log('✅ New subscription created for user:', userId);
+            console.log('✅ New subscription created successfully');
+            console.log('📊 Inserted data:', JSON.stringify(insertData, null, 2));
         }
         
     } catch (error) {
