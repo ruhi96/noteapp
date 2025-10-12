@@ -9,8 +9,9 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     subscription_status TEXT NOT NULL DEFAULT 'free', -- free, premium, expired, cancelled
     subscription_type TEXT, -- monthly, yearly, lifetime
     product_id TEXT, -- DODO Payments product ID
-    session_id TEXT UNIQUE, -- DODO Payments session ID
+    session_id TEXT, -- DODO Payments session ID
     payment_id TEXT, -- DODO Payments payment ID
+    subscription_id TEXT UNIQUE, -- DODO Payments subscription ID (unique identifier)
     amount DECIMAL(10,2), -- Payment amount
     currency TEXT DEFAULT 'USD',
     subscription_start_date TIMESTAMPTZ, -- When subscription became active
@@ -24,6 +25,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user_id ON user_subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_session_id ON user_subscriptions(session_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_payment_id ON user_subscriptions(payment_id);
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_subscription_id ON user_subscriptions(subscription_id);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_status ON user_subscriptions(subscription_status);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_is_active ON user_subscriptions(is_active);
 CREATE INDEX IF NOT EXISTS idx_user_subscriptions_created_at ON user_subscriptions(created_at DESC);
@@ -177,6 +179,7 @@ COMMENT ON COLUMN user_subscriptions.subscription_status IS 'Current subscriptio
 COMMENT ON COLUMN user_subscriptions.is_active IS 'Whether the subscription is currently active';
 COMMENT ON COLUMN user_subscriptions.session_id IS 'DODO Payments session ID';
 COMMENT ON COLUMN user_subscriptions.payment_id IS 'DODO Payments payment ID';
+COMMENT ON COLUMN user_subscriptions.subscription_id IS 'DODO Payments subscription ID (recurring subscription identifier)';
 
 COMMENT ON FUNCTION get_user_subscription_status(TEXT) IS 'Returns current subscription status for a user';
 COMMENT ON FUNCTION update_subscription_status(TEXT, TEXT, JSONB) IS 'Updates user subscription status and handles premium activations';

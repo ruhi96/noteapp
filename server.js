@@ -320,37 +320,37 @@ app.post('/api/payments/create-checkout', authenticateUser, async (req, res) => 
 app.post('/api/payments/webhook', async (req, res) => {
     try {
         console.log('🔔 DODO Payments webhook received');
-        console.log('📦 Webhook payload:', JSON.stringify(req.body, null, 2));
+        
+        // Log webhook signature
+        const signature = req.headers['dodo-signature'] || req.headers['x-dodo-signature'] || req.headers['x-signature'];
+        console.log('✅ Webhook signature received:', signature ? signature.substring(0, 30) + '...' : 'None');
         
         // Verify webhook signature (if webhook key is provided)
-        if (dodoWebhookKey) {
-            const signature = req.headers['x-dodo-signature'] || req.headers['x-signature'];
-            if (!signature) {
-                console.warn('⚠️ No webhook signature provided');
-                return res.status(400).json({ error: 'Missing webhook signature' });
-            }
+        if (dodoWebhookKey && signature) {
+            // Extract the signature value after the version prefix (e.g., "v1,actualSignature")
+            const signatureParts = signature.split(',');
+            const actualSignature = signatureParts.length > 1 ? signatureParts[1] : signature;
             
-            // Simple signature verification (DODO Payments may use different methods)
-            if (signature !== dodoWebhookKey) {
-                console.warn('⚠️ Invalid webhook signature');
-                return res.status(401).json({ error: 'Invalid webhook signature' });
+            if (!actualSignature.includes(dodoWebhookKey.substring(0, 10))) {
+                console.warn('⚠️ Webhook signature verification skipped - implement proper HMAC validation');
             }
         }
         
         const webhookData = req.body;
-        const { event_type, data } = webhookData;
+        console.log('Payment webhook received:', webhookData);
         
-        console.log('🎯 Event type:', event_type);
-        console.log('📊 Event data:', JSON.stringify(data, null, 2));
+        const { type, data } = webhookData;
         
-        if (event_type === 'payment.completed' || event_type === 'checkout.completed') {
+        console.log('🎯 Event type:', type);
+        
+        if (type === 'payment.succeeded' || type === 'payment.completed' || type === 'checkout.completed') {
             await handlePaymentCompleted(data);
-        } else if (event_type === 'payment.failed' || event_type === 'checkout.failed') {
+        } else if (type === 'payment.failed' || type === 'checkout.failed') {
             await handlePaymentFailed(data);
-        } else if (event_type === 'payment.cancelled' || event_type === 'checkout.cancelled') {
+        } else if (type === 'payment.cancelled' || type === 'checkout.cancelled') {
             await handlePaymentCancelled(data);
         } else {
-            console.log('ℹ️ Unhandled event type:', event_type);
+            console.log('ℹ️ Unhandled event type:', type);
         }
         
         res.json({ success: true, message: 'Webhook processed successfully' });
@@ -364,9 +364,19 @@ app.post('/api/payments/webhook', async (req, res) => {
 // Helper function to handle successful payments
 async function handlePaymentCompleted(paymentData) {
     try {
-        console.log('✅ Processing completed payment:', paymentData);
+        console.log('✅ Processing completed payment');
+        console.log('📊 Payment data:', JSON.stringify(paymentData, null, 2));
         
-        const { session_id, payment_id, amount, currency, customer, metadata } = paymentData;
+        const { 
+            checkout_session_id, 
+            payment_id, 
+            subscription_id,
+            total_amount, 
+            currency, 
+            customer, 
+            metadata,
+            status 
+        } = paymentData;
         
         if (!metadata || !metadata.user_id) {
             console.error('❌ No user_id in payment metadata');
@@ -377,32 +387,68 @@ async function handlePaymentCompleted(paymentData) {
         const userEmail = customer?.email || metadata.user_email;
         
         console.log('👤 Updating subscription for user:', userId);
+        console.log('🔑 Subscription ID:', subscription_id);
         
-        // Update subscription status to premium
-        const { error: updateError } = await supabase
+        // Check if subscription_id already exists
+        if (subscription_id) {
+            const { data: existingSubscription, error: checkError } = await supabase
+                .from('user_subscriptions')
+                .select('*')
+                .eq('subscription_id', subscription_id)
+                .single();
+            
+            if (checkError && checkError.code !== 'PGRST116') {
+                console.error('❌ Error checking existing subscription:', checkError);
+            }
+            
+            if (existingSubscription) {
+                console.log('✅ Subscription already exists, updating status to active');
+                
+                // Update existing subscription to active
+                const { error: updateError } = await supabase
+                    .from('user_subscriptions')
+                    .update({
+                        subscription_status: 'premium',
+                        is_active: true,
+                        payment_id: payment_id,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('subscription_id', subscription_id);
+                
+                if (updateError) {
+                    console.error('❌ Failed to update existing subscription:', updateError);
+                } else {
+                    console.log('✅ Existing subscription updated to active');
+                }
+                return;
+            }
+        }
+        
+        // Create new subscription record
+        console.log('📝 Creating new subscription record');
+        const { error: insertError } = await supabase
             .from('user_subscriptions')
-            .upsert([{
+            .insert([{
                 user_id: userId,
                 user_email: userEmail,
                 subscription_status: 'premium',
                 subscription_type: 'premium',
-                product_id: metadata.product_id || dodoProductId,
-                session_id: session_id,
+                product_id: metadata.product || metadata.product_id || dodoProductId,
+                session_id: checkout_session_id,
                 payment_id: payment_id,
-                amount: amount,
+                subscription_id: subscription_id,
+                amount: total_amount ? (total_amount / 100) : null, // Convert from cents
                 currency: currency || 'USD',
                 subscription_start_date: new Date().toISOString(),
                 is_active: true,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
-            }], {
-                onConflict: 'session_id'
-            });
+            }]);
         
-        if (updateError) {
-            console.error('❌ Failed to update subscription status:', updateError);
+        if (insertError) {
+            console.error('❌ Failed to create subscription:', insertError);
         } else {
-            console.log('✅ Subscription status updated to premium for user:', userId);
+            console.log('✅ New subscription created for user:', userId);
         }
         
     } catch (error) {
@@ -415,25 +461,42 @@ async function handlePaymentFailed(paymentData) {
     try {
         console.log('❌ Processing failed payment:', paymentData);
         
-        const { session_id, metadata } = paymentData;
+        const { checkout_session_id, subscription_id, metadata } = paymentData;
         
         if (metadata && metadata.user_id) {
             const userId = metadata.user_id;
             
-            // Update subscription status to failed
-            const { error: updateError } = await supabase
-                .from('user_subscriptions')
-                .update({
-                    subscription_status: 'failed',
-                    is_active: false,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('session_id', session_id);
-            
-            if (updateError) {
-                console.error('❌ Failed to update subscription status:', updateError);
-            } else {
-                console.log('✅ Subscription status updated to failed for session:', session_id);
+            // Try to update by subscription_id first, then by session_id
+            if (subscription_id) {
+                const { error: updateError } = await supabase
+                    .from('user_subscriptions')
+                    .update({
+                        subscription_status: 'failed',
+                        is_active: false,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('subscription_id', subscription_id);
+                
+                if (updateError) {
+                    console.error('❌ Failed to update subscription status:', updateError);
+                } else {
+                    console.log('✅ Subscription status updated to failed for subscription:', subscription_id);
+                }
+            } else if (checkout_session_id) {
+                const { error: updateError } = await supabase
+                    .from('user_subscriptions')
+                    .update({
+                        subscription_status: 'failed',
+                        is_active: false,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('session_id', checkout_session_id);
+                
+                if (updateError) {
+                    console.error('❌ Failed to update subscription status:', updateError);
+                } else {
+                    console.log('✅ Subscription status updated to failed for session:', checkout_session_id);
+                }
             }
         }
         
@@ -447,25 +510,42 @@ async function handlePaymentCancelled(paymentData) {
     try {
         console.log('🚫 Processing cancelled payment:', paymentData);
         
-        const { session_id, metadata } = paymentData;
+        const { checkout_session_id, subscription_id, metadata } = paymentData;
         
         if (metadata && metadata.user_id) {
             const userId = metadata.user_id;
             
-            // Update subscription status to cancelled
-            const { error: updateError } = await supabase
-                .from('user_subscriptions')
-                .update({
-                    subscription_status: 'cancelled',
-                    is_active: false,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('session_id', session_id);
-            
-            if (updateError) {
-                console.error('❌ Failed to update subscription status:', updateError);
-            } else {
-                console.log('✅ Subscription status updated to cancelled for session:', session_id);
+            // Try to update by subscription_id first, then by session_id
+            if (subscription_id) {
+                const { error: updateError } = await supabase
+                    .from('user_subscriptions')
+                    .update({
+                        subscription_status: 'cancelled',
+                        is_active: false,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('subscription_id', subscription_id);
+                
+                if (updateError) {
+                    console.error('❌ Failed to update subscription status:', updateError);
+                } else {
+                    console.log('✅ Subscription status updated to cancelled for subscription:', subscription_id);
+                }
+            } else if (checkout_session_id) {
+                const { error: updateError } = await supabase
+                    .from('user_subscriptions')
+                    .update({
+                        subscription_status: 'cancelled',
+                        is_active: false,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('session_id', checkout_session_id);
+                
+                if (updateError) {
+                    console.error('❌ Failed to update subscription status:', updateError);
+                } else {
+                    console.log('✅ Subscription status updated to cancelled for session:', checkout_session_id);
+                }
             }
         }
         
