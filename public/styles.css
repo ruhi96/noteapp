@@ -253,6 +253,31 @@ h1 {
     box-shadow: none;
 }
 
+.upgrade-premium-btn.premium-active {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    cursor: default;
+    animation: premiumPulse 2s infinite;
+}
+
+.upgrade-premium-btn.premium-active:hover {
+    transform: none;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+}
+
+@keyframes premiumPulse {
+    0% {
+        box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 16px rgba(76, 175, 80, 0.5);
+    }
+    100% {
+        box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+    }
+}
+
 /* Payment Notifications */
 .payment-notification {
     position: fixed;

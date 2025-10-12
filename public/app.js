@@ -7,6 +7,7 @@ class NoteApp {
         this.authToken = null;
         this.dodoProductId = null;
         this.googleAnalyticsId = null;
+        this.userSubscription = null; // Track user subscription status
         this.init();
     }
 
@@ -18,6 +19,8 @@ class NoteApp {
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 await this.handleAuthenticatedUser(user);
+                // Load user subscription status after authentication
+                await this.loadUserSubscriptionStatus();
             } else {
                 this.showAuthScreen();
             }
@@ -580,6 +583,10 @@ class NoteApp {
                     this.trackEvent('premium_upgrade_completed', {
                         user_id: this.currentUser?.uid
                     });
+                    // Reload subscription status after successful payment
+                    setTimeout(() => {
+                        this.loadUserSubscriptionStatus();
+                    }, 2000);
                     break;
                 case 'cancelled':
                     this.showErrorMessage('Payment was cancelled. You can try again anytime.');
@@ -657,6 +664,56 @@ class NoteApp {
             
         } catch (error) {
             console.error('❌ Failed to load DODO Payments configuration:', error);
+        }
+    }
+
+    async loadUserSubscriptionStatus() {
+        try {
+            if (!this.authToken) {
+                console.log('⚠️ No auth token available for subscription status check');
+                return;
+            }
+
+            const response = await fetch('/api/user/subscription-status', {
+                headers: {
+                    'Authorization': `Bearer ${this.authToken}`
+                }
+            });
+
+            if (!response.ok) {
+                console.warn('⚠️ Failed to load user subscription status');
+                return;
+            }
+
+            const subscriptionData = await response.json();
+            this.userSubscription = subscriptionData;
+            
+            console.log('✅ User subscription status loaded:', subscriptionData.status);
+            
+            // Update UI based on subscription status
+            this.updatePremiumButton();
+            
+        } catch (error) {
+            console.error('❌ Failed to load user subscription status:', error);
+        }
+    }
+
+    updatePremiumButton() {
+        const upgradeBtn = document.getElementById('upgradePremiumBtn');
+        if (!upgradeBtn) return;
+
+        if (this.userSubscription && this.userSubscription.isPremium) {
+            // User is premium
+            upgradeBtn.textContent = '👑 Premium';
+            upgradeBtn.disabled = true;
+            upgradeBtn.classList.add('premium-active');
+            upgradeBtn.title = 'You have an active Premium subscription';
+        } else {
+            // User is free
+            upgradeBtn.textContent = '⭐ Upgrade to Premium';
+            upgradeBtn.disabled = false;
+            upgradeBtn.classList.remove('premium-active');
+            upgradeBtn.title = 'Upgrade to Premium for unlimited features';
         }
     }
 

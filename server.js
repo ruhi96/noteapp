@@ -77,6 +77,7 @@ const supabaseStorageEndpoint = process.env.SUPABASE_STORAGE_ENDPOINT;
 const dodoPaymentsApiKey = process.env.DODO_PAYMENTS_API_KEY;
 const dodoProductId = process.env.DODO_PRODUCT_ID;
 const googleAnalyticsId = process.env.GOOGLE_ANALYTICS_ID;
+const dodoWebhookKey = process.env.DODO_WEBHOOK_KEY;
 
 console.log('📦 Supabase Configuration:');
 console.log('   URL:', supabaseUrl);
@@ -85,6 +86,7 @@ console.log('   Service Key:', supabaseServiceKey ? '✓ Set' : '❌ Missing');
 console.log('   Storage Endpoint:', supabaseStorageEndpoint);
 console.log('💳 DODO Payments API Key:', dodoPaymentsApiKey ? '✓ Set' : '❌ Missing');
 console.log('💳 DODO Product ID:', dodoProductId ? '✓ Set' : '❌ Missing');
+console.log('🔗 DODO Webhook Key:', dodoWebhookKey ? '✓ Set' : '❌ Missing');
 console.log('📊 Google Analytics ID:', googleAnalyticsId ? '✓ Set' : '❌ Missing');
 
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -311,6 +313,200 @@ app.post('/api/payments/create-checkout', authenticateUser, async (req, res) => 
         res.status(500).json({ 
             error: 'Failed to create checkout session: ' + error.message 
         });
+    }
+});
+
+// DODO Payments Webhook Handler
+app.post('/api/payments/webhook', async (req, res) => {
+    try {
+        console.log('🔔 DODO Payments webhook received');
+        console.log('📦 Webhook payload:', JSON.stringify(req.body, null, 2));
+        
+        // Verify webhook signature (if webhook key is provided)
+        if (dodoWebhookKey) {
+            const signature = req.headers['x-dodo-signature'] || req.headers['x-signature'];
+            if (!signature) {
+                console.warn('⚠️ No webhook signature provided');
+                return res.status(400).json({ error: 'Missing webhook signature' });
+            }
+            
+            // Simple signature verification (DODO Payments may use different methods)
+            if (signature !== dodoWebhookKey) {
+                console.warn('⚠️ Invalid webhook signature');
+                return res.status(401).json({ error: 'Invalid webhook signature' });
+            }
+        }
+        
+        const webhookData = req.body;
+        const { event_type, data } = webhookData;
+        
+        console.log('🎯 Event type:', event_type);
+        console.log('📊 Event data:', JSON.stringify(data, null, 2));
+        
+        if (event_type === 'payment.completed' || event_type === 'checkout.completed') {
+            await handlePaymentCompleted(data);
+        } else if (event_type === 'payment.failed' || event_type === 'checkout.failed') {
+            await handlePaymentFailed(data);
+        } else if (event_type === 'payment.cancelled' || event_type === 'checkout.cancelled') {
+            await handlePaymentCancelled(data);
+        } else {
+            console.log('ℹ️ Unhandled event type:', event_type);
+        }
+        
+        res.json({ success: true, message: 'Webhook processed successfully' });
+        
+    } catch (error) {
+        console.error('❌ Webhook processing error:', error);
+        res.status(500).json({ error: 'Webhook processing failed' });
+    }
+});
+
+// Helper function to handle successful payments
+async function handlePaymentCompleted(paymentData) {
+    try {
+        console.log('✅ Processing completed payment:', paymentData);
+        
+        const { session_id, payment_id, amount, currency, customer, metadata } = paymentData;
+        
+        if (!metadata || !metadata.user_id) {
+            console.error('❌ No user_id in payment metadata');
+            return;
+        }
+        
+        const userId = metadata.user_id;
+        const userEmail = customer?.email || metadata.user_email;
+        
+        console.log('👤 Updating subscription for user:', userId);
+        
+        // Update subscription status to premium
+        const { error: updateError } = await supabase
+            .from('user_subscriptions')
+            .upsert([{
+                user_id: userId,
+                user_email: userEmail,
+                subscription_status: 'premium',
+                subscription_type: 'premium',
+                product_id: metadata.product_id || dodoProductId,
+                session_id: session_id,
+                payment_id: payment_id,
+                amount: amount,
+                currency: currency || 'USD',
+                subscription_start_date: new Date().toISOString(),
+                is_active: true,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            }], {
+                onConflict: 'session_id'
+            });
+        
+        if (updateError) {
+            console.error('❌ Failed to update subscription status:', updateError);
+        } else {
+            console.log('✅ Subscription status updated to premium for user:', userId);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error handling payment completion:', error);
+    }
+}
+
+// Helper function to handle failed payments
+async function handlePaymentFailed(paymentData) {
+    try {
+        console.log('❌ Processing failed payment:', paymentData);
+        
+        const { session_id, metadata } = paymentData;
+        
+        if (metadata && metadata.user_id) {
+            const userId = metadata.user_id;
+            
+            // Update subscription status to failed
+            const { error: updateError } = await supabase
+                .from('user_subscriptions')
+                .update({
+                    subscription_status: 'failed',
+                    is_active: false,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('session_id', session_id);
+            
+            if (updateError) {
+                console.error('❌ Failed to update subscription status:', updateError);
+            } else {
+                console.log('✅ Subscription status updated to failed for session:', session_id);
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Error handling payment failure:', error);
+    }
+}
+
+// Helper function to handle cancelled payments
+async function handlePaymentCancelled(paymentData) {
+    try {
+        console.log('🚫 Processing cancelled payment:', paymentData);
+        
+        const { session_id, metadata } = paymentData;
+        
+        if (metadata && metadata.user_id) {
+            const userId = metadata.user_id;
+            
+            // Update subscription status to cancelled
+            const { error: updateError } = await supabase
+                .from('user_subscriptions')
+                .update({
+                    subscription_status: 'cancelled',
+                    is_active: false,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('session_id', session_id);
+            
+            if (updateError) {
+                console.error('❌ Failed to update subscription status:', updateError);
+            } else {
+                console.log('✅ Subscription status updated to cancelled for session:', session_id);
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Error handling payment cancellation:', error);
+    }
+}
+
+// Get user subscription status
+app.get('/api/user/subscription-status', authenticateUser, async (req, res) => {
+    try {
+        const userId = req.user.uid;
+        
+        console.log('📊 Getting subscription status for user:', userId);
+        
+        // Get user's current subscription status
+        const { data: subscription, error } = await supabase
+            .from('user_subscriptions')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+            console.error('❌ Error fetching subscription status:', error);
+            return res.status(500).json({ error: 'Failed to fetch subscription status' });
+        }
+        
+        const isPremium = subscription && subscription.subscription_status === 'premium';
+        
+        res.json({
+            isPremium: isPremium,
+            subscription: subscription || null,
+            status: isPremium ? 'premium' : 'free'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error getting subscription status:', error);
+        res.status(500).json({ error: 'Failed to get subscription status' });
     }
 });
 
