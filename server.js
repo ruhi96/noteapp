@@ -630,11 +630,13 @@ async function handlePaymentCancelled(paymentData) {
 app.get('/api/user/subscription-status', authenticateUser, async (req, res) => {
     try {
         const userId = req.user.uid;
+        const userEmail = req.user.email;
         
         console.log('📊 Getting subscription status for user:', userId);
+        console.log('   Email:', userEmail);
         
-        // Get user's current subscription status
-        const { data: subscription, error } = await supabase
+        // Get user's current subscription status (use service key for reliability)
+        const { data: subscription, error } = await supabaseService
             .from('user_subscriptions')
             .select('*')
             .eq('user_id', userId)
@@ -645,10 +647,23 @@ app.get('/api/user/subscription-status', authenticateUser, async (req, res) => {
         
         if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
             console.error('❌ Error fetching subscription status:', error);
+            console.error('   Error code:', error.code);
+            console.error('   Error details:', JSON.stringify(error, null, 2));
             return res.status(500).json({ error: 'Failed to fetch subscription status' });
         }
         
-        const isPremium = subscription && subscription.subscription_status === 'premium';
+        if (error && error.code === 'PGRST116') {
+            console.log('ℹ️ No active subscription found for user:', userId);
+        } else if (subscription) {
+            console.log('✅ Subscription found:');
+            console.log('   Status:', subscription.subscription_status);
+            console.log('   Is Active:', subscription.is_active);
+            console.log('   Subscription ID:', subscription.subscription_id);
+        }
+        
+        const isPremium = subscription && subscription.subscription_status === 'premium' && subscription.is_active;
+        
+        console.log('📊 Result: isPremium =', isPremium);
         
         res.json({
             isPremium: isPremium,
