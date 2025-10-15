@@ -320,6 +320,7 @@ app.post('/api/payments/create-checkout', authenticateUser, async (req, res) => 
 app.post('/api/payments/webhook', async (req, res) => {
     try {
         console.log('🔔 DODO Payments webhook received');
+        console.log('📋 Request headers:', JSON.stringify(req.headers, null, 2));
         
         // Log webhook signature
         const signature = req.headers['dodo-signature'] || req.headers['x-dodo-signature'] || req.headers['x-signature'];
@@ -337,7 +338,7 @@ app.post('/api/payments/webhook', async (req, res) => {
         }
         
         const webhookData = req.body;
-        console.log('Payment webhook received:', webhookData);
+        console.log('📦 Full webhook payload:', JSON.stringify(webhookData, null, 2));
         
         const { type, data } = webhookData;
         
@@ -378,13 +379,37 @@ async function handlePaymentCompleted(paymentData) {
             status 
         } = paymentData;
         
-        if (!metadata || !metadata.user_id) {
-            console.error('❌ No user_id in payment metadata');
+        // Get user_id from metadata or lookup from payment_sessions table
+        let userId = metadata?.user_id;
+        let userEmail = customer?.email || metadata?.user_email;
+        
+        if (!userId && checkout_session_id) {
+            console.log('⚠️ No user_id in metadata, looking up in payment_sessions table...');
+            console.log('🔍 Looking up session_id:', checkout_session_id);
+            
+            const { data: sessionData, error: sessionError } = await supabase
+                .from('payment_sessions')
+                .select('user_id, user_email')
+                .eq('session_id', checkout_session_id)
+                .single();
+            
+            if (sessionError) {
+                console.error('❌ Failed to lookup payment session:', sessionError);
+                console.error('❌ Error details:', JSON.stringify(sessionError, null, 2));
+            } else if (sessionData) {
+                userId = sessionData.user_id;
+                userEmail = userEmail || sessionData.user_email;
+                console.log('✅ Found user_id from payment_sessions:', userId);
+            }
+        }
+        
+        if (!userId) {
+            console.error('❌ Could not determine user_id from metadata or payment_sessions table');
+            console.error('❌ Payment data:', JSON.stringify(paymentData, null, 2));
             return;
         }
         
-        const userId = metadata.user_id;
-        const userEmail = customer?.email || metadata.user_email;
+        console.log('👤 Processing payment for user_id:', userId);
         
         console.log('👤 Updating subscription for user:', userId);
         console.log('🔑 Subscription ID:', subscription_id);
@@ -478,8 +503,24 @@ async function handlePaymentFailed(paymentData) {
         
         const { checkout_session_id, subscription_id, metadata } = paymentData;
         
-        if (metadata && metadata.user_id) {
-            const userId = metadata.user_id;
+        // Get user_id from metadata or lookup from payment_sessions table
+        let userId = metadata?.user_id;
+        
+        if (!userId && checkout_session_id) {
+            console.log('⚠️ No user_id in metadata, looking up in payment_sessions table...');
+            const { data: sessionData } = await supabase
+                .from('payment_sessions')
+                .select('user_id')
+                .eq('session_id', checkout_session_id)
+                .single();
+            
+            if (sessionData) {
+                userId = sessionData.user_id;
+                console.log('✅ Found user_id from payment_sessions:', userId);
+            }
+        }
+        
+        if (userId) {
             
             // Try to update by subscription_id first, then by session_id
             if (subscription_id) {
@@ -527,8 +568,24 @@ async function handlePaymentCancelled(paymentData) {
         
         const { checkout_session_id, subscription_id, metadata } = paymentData;
         
-        if (metadata && metadata.user_id) {
-            const userId = metadata.user_id;
+        // Get user_id from metadata or lookup from payment_sessions table
+        let userId = metadata?.user_id;
+        
+        if (!userId && checkout_session_id) {
+            console.log('⚠️ No user_id in metadata, looking up in payment_sessions table...');
+            const { data: sessionData } = await supabase
+                .from('payment_sessions')
+                .select('user_id')
+                .eq('session_id', checkout_session_id)
+                .single();
+            
+            if (sessionData) {
+                userId = sessionData.user_id;
+                console.log('✅ Found user_id from payment_sessions:', userId);
+            }
+        }
+        
+        if (userId) {
             
             // Try to update by subscription_id first, then by session_id
             if (subscription_id) {

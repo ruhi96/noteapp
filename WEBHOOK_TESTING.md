@@ -10,7 +10,7 @@ When DODO Payments sends a `payment.succeeded` webhook:
    - `subscription_id` (e.g., `sub_65BdAyLSsVOQL0xXXrUdF`)
    - `payment_id` (e.g., `pay_y8Kv1LHb5If80PkXn7dmH`)
    - `checkout_session_id` (e.g., `cks_URuC2d4xNonSIKk3n8k6m`)
-   - User information from `metadata`
+   - User information from `metadata` **OR** from `payment_sessions` table as fallback
    - Payment amount and currency
 
 2. **Checks if subscription exists**:
@@ -231,15 +231,26 @@ ORDER BY created_at DESC;
 
 ### Issue: "No user_id in payment metadata"
 
-**Cause:** The webhook doesn't have user information
+**Cause:** The webhook doesn't have user information in metadata
 
-**Fix:** Ensure checkout session includes metadata:
+**Fix:** The webhook handler now has a **fallback mechanism**:
+1. First tries to get `user_id` from webhook `metadata`
+2. If not found, looks up the `checkout_session_id` in the `payment_sessions` table
+3. Retrieves `user_id` from the stored session data
+
+**Ensure checkout session includes metadata:**
 ```javascript
 metadata: {
     user_id: req.user.uid,
     user_email: req.user.email,
     product: 'premium_upgrade'
 }
+```
+
+**Verify payment session is logged:**
+```sql
+SELECT * FROM payment_sessions 
+WHERE session_id = 'cks_URuC2d4xNonSIKk3n8k6m';
 ```
 
 ### Issue: Duplicate subscriptions created
