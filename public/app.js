@@ -118,8 +118,11 @@ class NoteApp {
     async handleAuthenticatedUser(user) {
         this.currentUser = user;
         
-        // Get the ID token
-        this.authToken = await user.getIdToken();
+        // Get the ID token (force refresh to ensure it's valid)
+        this.authToken = await user.getIdToken(true);
+        
+        // Set up automatic token refresh every 50 minutes (tokens expire after 60 minutes)
+        this.setupTokenRefresh();
         
         // Show app screen
         this.showAppScreen();
@@ -139,6 +142,58 @@ class NoteApp {
         
         // Load notes
         await this.loadNotes();
+    }
+    
+    setupTokenRefresh() {
+        // Clear any existing refresh interval
+        if (this.tokenRefreshInterval) {
+            clearInterval(this.tokenRefreshInterval);
+        }
+        
+        // Refresh token every 50 minutes (before the 60-minute expiration)
+        this.tokenRefreshInterval = setInterval(async () => {
+            if (this.currentUser) {
+                try {
+                    console.log('🔄 Refreshing Firebase ID token...');
+                    this.authToken = await this.currentUser.getIdToken(true);
+                    console.log('✅ Token refreshed successfully');
+                } catch (error) {
+                    console.error('❌ Failed to refresh token:', error);
+                    // If refresh fails, user might need to re-authenticate
+                    if (error.code === 'auth/user-token-expired') {
+                        alert('Your session has expired. Please sign in again.');
+                        await this.signOut();
+                    }
+                }
+            }
+        }, 50 * 60 * 1000); // 50 minutes in milliseconds
+        
+        console.log('⏰ Token auto-refresh set up (every 50 minutes)');
+    }
+    
+    async getFreshToken() {
+        // Helper method to get a fresh token with error handling
+        if (!this.currentUser) {
+            throw new Error('No user logged in');
+        }
+        
+        try {
+            // Get fresh token (force refresh)
+            this.authToken = await this.currentUser.getIdToken(true);
+            return this.authToken;
+        } catch (error) {
+            console.error('❌ Failed to get fresh token:', error);
+            
+            // If token is expired, try to refresh the user
+            if (error.code === 'auth/user-token-expired' || error.code === 'auth/id-token-expired') {
+                console.log('🔄 Token expired, attempting to re-authenticate...');
+                await auth.currentUser?.reload();
+                this.authToken = await this.currentUser.getIdToken(true);
+                return this.authToken;
+            }
+            
+            throw error;
+        }
     }
 
     showAuthScreen() {
@@ -224,6 +279,12 @@ class NoteApp {
 
     async signOut() {
         try {
+            // Clear token refresh interval
+            if (this.tokenRefreshInterval) {
+                clearInterval(this.tokenRefreshInterval);
+                this.tokenRefreshInterval = null;
+            }
+            
             await auth.signOut();
             this.currentUser = null;
             this.authToken = null;
@@ -413,11 +474,11 @@ class NoteApp {
             this.addNoteBtn.disabled = true;
             this.addNoteBtn.textContent = 'Creating...';
             
-            // Refresh token if needed
-            this.authToken = await this.currentUser.getIdToken();
+            // Get fresh token
+            await this.getFreshToken();
 
             // First, create the note to get the note ID
-            const response = await fetch(this.apiUrl, {
+            let response = await fetch(this.apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -425,6 +486,20 @@ class NoteApp {
                 },
                 body: JSON.stringify({ title, content, attachments: [] })
             });
+
+            // Retry with fresh token if unauthorized
+            if (response.status === 401) {
+                console.log('🔄 Token expired, retrying with fresh token...');
+                await this.getFreshToken();
+                response = await fetch(this.apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.authToken}`
+                    },
+                    body: JSON.stringify({ title, content, attachments: [] })
+                });
+            }
 
             if (!response.ok) {
                 throw new Error('Failed to create note');
@@ -506,15 +581,26 @@ class NoteApp {
 
     async loadNotes() {
         try {
-            // Refresh token if needed
-            this.authToken = await this.currentUser.getIdToken();
+            // Get fresh token
+            await this.getFreshToken();
 
             // Fetch notes from backend with auth token
-            const response = await fetch(this.apiUrl, {
+            let response = await fetch(this.apiUrl, {
                 headers: {
                     'Authorization': `Bearer ${this.authToken}`
                 }
             });
+            
+            // Retry with fresh token if unauthorized
+            if (response.status === 401) {
+                console.log('🔄 Token expired, retrying with fresh token...');
+                await this.getFreshToken();
+                response = await fetch(this.apiUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${this.authToken}`
+                    }
+                });
+            }
             
             if (!response.ok) {
                 throw new Error('Failed to load notes');
@@ -708,18 +794,27 @@ class NoteApp {
 
     async loadUserSubscriptionStatus() {
         try {
-            if (!this.authToken) {
-                console.log('⚠️ No auth token available for subscription status check');
-                return;
-            }
+            // Get fresh token
+            await this.getFreshToken();
 
             console.log('📊 Checking subscription status...');
             
-            const response = await fetch('/api/user/subscription-status', {
+            let response = await fetch('/api/user/subscription-status', {
                 headers: {
                     'Authorization': `Bearer ${this.authToken}`
                 }
             });
+
+            // Retry with fresh token if unauthorized
+            if (response.status === 401) {
+                console.log('🔄 Token expired, retrying with fresh token...');
+                await this.getFreshToken();
+                response = await fetch('/api/user/subscription-status', {
+                    headers: {
+                        'Authorization': `Bearer ${this.authToken}`
+                    }
+                });
+            }
 
             if (!response.ok) {
                 console.warn('⚠️ Failed to load user subscription status');
@@ -906,8 +1001,11 @@ class NoteApp {
             
             console.log('📦 Using product ID:', this.dodoProductId);
             
+            // Get fresh token
+            await this.getFreshToken();
+            
             // Create checkout session
-            const response = await fetch('/api/payments/create-checkout', {
+            let response = await fetch('/api/payments/create-checkout', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -917,6 +1015,22 @@ class NoteApp {
                     productId: this.dodoProductId
                 })
             });
+
+            // Retry with fresh token if unauthorized
+            if (response.status === 401) {
+                console.log('🔄 Token expired, retrying with fresh token...');
+                await this.getFreshToken();
+                response = await fetch('/api/payments/create-checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${this.authToken}`
+                    },
+                    body: JSON.stringify({
+                        productId: this.dodoProductId
+                    })
+                });
+            }
 
             if (!response.ok) {
                 const errorData = await response.json();

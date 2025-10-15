@@ -387,7 +387,7 @@ async function handlePaymentCompleted(paymentData) {
             console.log('⚠️ No user_id in metadata, looking up in payment_sessions table...');
             console.log('🔍 Looking up session_id:', checkout_session_id);
             
-            const { data: sessionData, error: sessionError } = await supabase
+            const { data: sessionData, error: sessionError } = await supabaseService
                 .from('payment_sessions')
                 .select('user_id, user_email')
                 .eq('session_id', checkout_session_id)
@@ -418,7 +418,7 @@ async function handlePaymentCompleted(paymentData) {
         if (subscription_id) {
             console.log('🔍 Checking if subscription_id exists:', subscription_id);
             
-            const { data: existingSubscription, error: checkError } = await supabase
+            const { data: existingSubscription, error: checkError } = await supabaseService
                 .from('user_subscriptions')
                 .select('*')
                 .eq('subscription_id', subscription_id)
@@ -437,7 +437,7 @@ async function handlePaymentCompleted(paymentData) {
                 console.log('✅ Subscription already exists, updating status to active');
                 
                 // Update existing subscription to active
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseService
                     .from('user_subscriptions')
                     .update({
                         subscription_status: 'premium',
@@ -478,7 +478,7 @@ async function handlePaymentCompleted(paymentData) {
         
         console.log('📊 Subscription record to insert:', JSON.stringify(subscriptionRecord, null, 2));
         
-        const { data: insertData, error: insertError } = await supabase
+        const { data: insertData, error: insertError } = await supabaseService
             .from('user_subscriptions')
             .insert([subscriptionRecord])
             .select();
@@ -508,7 +508,7 @@ async function handlePaymentFailed(paymentData) {
         
         if (!userId && checkout_session_id) {
             console.log('⚠️ No user_id in metadata, looking up in payment_sessions table...');
-            const { data: sessionData } = await supabase
+            const { data: sessionData } = await supabaseService
                 .from('payment_sessions')
                 .select('user_id')
                 .eq('session_id', checkout_session_id)
@@ -524,7 +524,7 @@ async function handlePaymentFailed(paymentData) {
             
             // Try to update by subscription_id first, then by session_id
             if (subscription_id) {
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseService
                     .from('user_subscriptions')
                     .update({
                         subscription_status: 'failed',
@@ -539,7 +539,7 @@ async function handlePaymentFailed(paymentData) {
                     console.log('✅ Subscription status updated to failed for subscription:', subscription_id);
                 }
             } else if (checkout_session_id) {
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseService
                     .from('user_subscriptions')
                     .update({
                         subscription_status: 'failed',
@@ -573,7 +573,7 @@ async function handlePaymentCancelled(paymentData) {
         
         if (!userId && checkout_session_id) {
             console.log('⚠️ No user_id in metadata, looking up in payment_sessions table...');
-            const { data: sessionData } = await supabase
+            const { data: sessionData } = await supabaseService
                 .from('payment_sessions')
                 .select('user_id')
                 .eq('session_id', checkout_session_id)
@@ -589,7 +589,7 @@ async function handlePaymentCancelled(paymentData) {
             
             // Try to update by subscription_id first, then by session_id
             if (subscription_id) {
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseService
                     .from('user_subscriptions')
                     .update({
                         subscription_status: 'cancelled',
@@ -604,7 +604,7 @@ async function handlePaymentCancelled(paymentData) {
                     console.log('✅ Subscription status updated to cancelled for subscription:', subscription_id);
                 }
             } else if (checkout_session_id) {
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseService
                     .from('user_subscriptions')
                     .update({
                         subscription_status: 'cancelled',
