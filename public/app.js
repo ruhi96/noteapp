@@ -60,6 +60,9 @@ class NoteApp {
         // Premium upgrade
         document.getElementById('upgradePremiumBtn').addEventListener('click', () => this.upgradeToPremium());
         
+        // Webhook test
+        document.getElementById('testWebhookBtn').addEventListener('click', () => this.testWebhook());
+        
         // Add refresh subscription status button (if exists)
         const refreshBtn = document.getElementById('refreshSubscriptionBtn');
         if (refreshBtn) {
@@ -273,6 +276,35 @@ class NoteApp {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 this.noteContent.focus();
+            }
+        });
+        
+        // Webhook modal event listeners
+        this.setupWebhookModalListeners();
+    }
+    
+    setupWebhookModalListeners() {
+        const webhookModal = document.getElementById('webhookModal');
+        const closeBtn = document.querySelector('.webhook-modal-close');
+        
+        // Close modal when clicking X
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                webhookModal.style.display = 'none';
+            });
+        }
+        
+        // Close modal when clicking outside
+        webhookModal.addEventListener('click', (event) => {
+            if (event.target === webhookModal) {
+                webhookModal.style.display = 'none';
+            }
+        });
+        
+        // Close modal with ESC key
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && webhookModal.style.display === 'flex') {
+                webhookModal.style.display = 'none';
             }
         });
     }
@@ -916,6 +948,132 @@ class NoteApp {
             
             // Show error message
             this.showError('Failed to start premium upgrade. Please try again.');
+        }
+    }
+
+    async testWebhook() {
+        try {
+            const testWebhookBtn = document.getElementById('testWebhookBtn');
+            const webhookModal = document.getElementById('webhookModal');
+            const webhookResults = document.getElementById('webhookResults');
+            
+            // Show modal
+            webhookModal.style.display = 'flex';
+            
+            // Show loading state
+            webhookResults.innerHTML = `
+                <div class="webhook-status loading">
+                    🔄 Sending webhook request...
+                </div>
+            `;
+            
+            // Disable button
+            testWebhookBtn.disabled = true;
+            testWebhookBtn.textContent = '⏳ Testing...';
+            
+            console.log('🔔 Testing webhook with user:', this.currentUser.uid);
+            
+            // Prepare webhook test payload
+            const webhookPayload = {
+                type: 'payment.succeeded',
+                business_id: 'bus_TEST123',
+                timestamp: new Date().toISOString(),
+                data: {
+                    subscription_id: `sub_TEST_${Date.now()}`,
+                    payment_id: `pay_TEST_${Date.now()}`,
+                    checkout_session_id: `cks_TEST_${Date.now()}`,
+                    total_amount: 10905,
+                    currency: 'INR',
+                    status: 'succeeded',
+                    customer: {
+                        email: this.currentUser.email,
+                        name: this.currentUser.displayName || this.currentUser.email.split('@')[0]
+                    },
+                    metadata: {
+                        user_id: this.currentUser.uid,
+                        user_email: this.currentUser.email,
+                        source: 'webhook_test',
+                        timestamp: new Date().toISOString()
+                    }
+                }
+            };
+            
+            console.log('📤 Webhook payload:', JSON.stringify(webhookPayload, null, 2));
+            
+            // Send webhook request
+            const response = await fetch('/api/payments/webhook', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'dodo-signature': 'v1,test_signature_12345'
+                },
+                body: JSON.stringify(webhookPayload)
+            });
+            
+            const responseData = await response.json();
+            
+            console.log('📥 Webhook response:', responseData);
+            
+            // Display results
+            if (response.ok) {
+                webhookResults.innerHTML = `
+                    <div class="webhook-status success">
+                        ✅ Webhook processed successfully!
+                    </div>
+                    
+                    <h3>Request Payload</h3>
+                    <pre>${JSON.stringify(webhookPayload, null, 2)}</pre>
+                    
+                    <h3>Response</h3>
+                    <pre>${JSON.stringify(responseData, null, 2)}</pre>
+                    
+                    <h3>Response Status</h3>
+                    <pre>HTTP ${response.status} ${response.statusText}</pre>
+                    
+                    <p style="margin-top: 20px; color: #666; font-size: 0.9rem;">
+                        💡 Check the browser console and server logs for detailed processing information.
+                    </p>
+                `;
+                
+                // Refresh subscription status after successful webhook
+                setTimeout(() => {
+                    this.loadUserSubscriptionStatus();
+                }, 2000);
+                
+            } else {
+                webhookResults.innerHTML = `
+                    <div class="webhook-status error">
+                        ❌ Webhook processing failed
+                    </div>
+                    
+                    <h3>Error Response</h3>
+                    <pre>${JSON.stringify(responseData, null, 2)}</pre>
+                    
+                    <h3>Response Status</h3>
+                    <pre>HTTP ${response.status} ${response.statusText}</pre>
+                    
+                    <h3>Request Payload</h3>
+                    <pre>${JSON.stringify(webhookPayload, null, 2)}</pre>
+                `;
+            }
+            
+        } catch (error) {
+            console.error('❌ Webhook test error:', error);
+            
+            const webhookResults = document.getElementById('webhookResults');
+            webhookResults.innerHTML = `
+                <div class="webhook-status error">
+                    ❌ Error: ${error.message}
+                </div>
+                
+                <h3>Error Details</h3>
+                <pre>${error.stack || error.toString()}</pre>
+            `;
+        } finally {
+            // Reset button
+            const testWebhookBtn = document.getElementById('testWebhookBtn');
+            testWebhookBtn.disabled = false;
+            testWebhookBtn.textContent = '🔔 Test Webhook';
         }
     }
 
