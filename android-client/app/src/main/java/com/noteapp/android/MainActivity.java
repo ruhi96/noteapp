@@ -35,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     private Button signInButton;
     private ProgressBar progressBar;
     private TextView statusText;
+    private TextView debugText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
         signInButton = findViewById(R.id.sign_in_button);
         progressBar = findViewById(R.id.progress_bar);
         statusText = findViewById(R.id.status_text);
+        debugText = findViewById(R.id.debug_text);
 
         // Configure Google Sign In
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -68,6 +70,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void signIn() {
         showLoading(true);
+        addDebugLog("🔵 Starting Google Sign-In...");
         Intent signInIntent = mGoogleSignInClient.getSignInIntent();
         startActivityForResult(signInIntent, RC_SIGN_IN);
     }
@@ -80,10 +83,17 @@ public class MainActivity extends AppCompatActivity {
             Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
             try {
                 GoogleSignInAccount account = task.getResult(ApiException.class);
+                addDebugLog("✅ Google Sign-In successful");
+                addDebugLog("📧 Email: " + account.getEmail());
+                addDebugLog("👤 Name: " + account.getDisplayName());
+                addDebugLog("🔑 ID Token: " + account.getIdToken().substring(0, 50) + "...");
+                addDebugLog("🔵 Authenticating with Firebase...");
                 firebaseAuthWithGoogle(account);
             } catch (ApiException e) {
                 Log.w(TAG, "Google sign in failed", e);
-                showError("Google sign in failed: " + e.getMessage());
+                addDebugLog("❌ Google Sign-In failed: " + e.getStatusCode());
+                addDebugLog("Error: " + e.getMessage());
+                showError("Google sign in failed: Code " + e.getStatusCode() + "\n" + e.getMessage());
                 showLoading(false);
             }
         }
@@ -91,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
         Log.d(TAG, "firebaseAuthWithGoogle:" + acct.getId());
+        addDebugLog("🔵 Signing in to Firebase...");
 
         AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);
         mAuth.signInWithCredential(credential)
@@ -100,10 +111,31 @@ public class MainActivity extends AppCompatActivity {
                         if (task.isSuccessful()) {
                             Log.d(TAG, "signInWithCredential:success");
                             FirebaseUser user = mAuth.getCurrentUser();
-                            navigateToNotes();
+                            addDebugLog("✅ Firebase authentication successful!");
+                            addDebugLog("👤 User ID: " + user.getUid());
+                            addDebugLog("📧 Email: " + user.getEmail());
+                            
+                            // Get Firebase ID token
+                            user.getIdToken(true).addOnCompleteListener(tokenTask -> {
+                                if (tokenTask.isSuccessful()) {
+                                    String token = tokenTask.getResult().getToken();
+                                    addDebugLog("🔑 Firebase ID Token obtained");
+                                    addDebugLog("Token (first 100 chars): " + token.substring(0, Math.min(100, token.length())) + "...");
+                                    addDebugLog("Token length: " + token.length() + " chars");
+                                    addDebugLog("✅ Navigating to notes...");
+                                    
+                                    // Wait 2 seconds so user can see debug info
+                                    new android.os.Handler().postDelayed(() -> navigateToNotes(), 2000);
+                                } else {
+                                    addDebugLog("❌ Failed to get Firebase token");
+                                    showError("Failed to get auth token: " + tokenTask.getException().getMessage());
+                                }
+                            });
                         } else {
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
-                            showError("Authentication failed: " + task.getException().getMessage());
+                            addDebugLog("❌ Firebase authentication failed!");
+                            addDebugLog("Error: " + task.getException().getMessage());
+                            showError("Firebase auth failed:\n" + task.getException().getMessage());
                             showLoading(false);
                         }
                     }
@@ -128,6 +160,26 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() -> {
             Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
             statusText.setText(message);
+            statusText.setVisibility(View.VISIBLE);
+        });
+    }
+    
+    private void addDebugLog(String message) {
+        runOnUiThread(() -> {
+            String timestamp = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date());
+            String currentText = debugText.getText().toString();
+            String newText = currentText + "\n[" + timestamp + "] " + message;
+            debugText.setText(newText);
+            debugText.setVisibility(View.VISIBLE);
+            
+            // Auto-scroll to bottom
+            final android.widget.ScrollView scrollView = findViewById(R.id.debug_scroll);
+            if (scrollView != null) {
+                scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+            }
+            
+            // Also log to Logcat
+            Log.d(TAG, message);
         });
     }
 }
