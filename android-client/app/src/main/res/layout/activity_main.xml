@@ -64,7 +64,6 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Debug Log Section -->
     <ScrollView
         android:id="@+id/debug_scroll"
         android:layout_width="match_parent"
@@ -79,10 +78,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
-            android:text="Debug Log:\n"
+            android:text="🔍 Debug Log:\n"
             android:textColor="@android:color/black"
-            android:textSize="12sp"
-            android:visibility="visible" />
+            android:textSize="11sp" />
     </ScrollView>
 
 </RelativeLayout>
