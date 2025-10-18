@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NoteApp</string>
+    <string name="welcome_message">Secure notes with cloud sync</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="logout">Logout</string>
+    <string name="refresh">Refresh</string>
+    <string name="save">Save</string>
+    <string name="add_note">Add Note</string>
+    <string name="note_title">Title</string>
+    <string name="note_content">Content</string>
+    <string name="attach_file">Attach File</string>
+    <string name="no_file_attached">No file attached</string>
+    <string name="no_notes_yet">No notes yet\nTap + to create one</string>
+    <string name="status_free">Status: Free</string>
+    <string name="date_placeholder">Date</string>
+    
+    <!-- Web Client ID from Firebase Console - Replace with actual value after downloading fresh google-services.json -->
+    <string name="default_web_client_id">520774016263-REPLACE_THIS.apps.googleusercontent.com</string>
+</resources>
+

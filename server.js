@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 const admin = require('firebase-admin');
 
@@ -97,6 +98,12 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' })); // Increase limit for file uploads
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
+
+// Configure multer for multipart file uploads (for Android app)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
 
 // Auth middleware
 async function authenticateUser(req, res, next) {
@@ -768,8 +775,55 @@ app.get('/api/notes', authenticateUser, async (req, res) => {
     }
 });
 
-// Upload file to Supabase Storage (mapped to note)
-app.post('/api/upload', authenticateUser, async (req, res) => {
+// Multipart file upload for Android app
+app.post('/api/upload', authenticateUser, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file provided' });
+        }
+        
+        const timestamp = Date.now();
+        const sanitizedFileName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `${req.user.uid}/files/${timestamp}-${sanitizedFileName}`;
+        
+        console.log('📤 Uploading multipart file to Supabase Storage:');
+        console.log('   Path:', filePath);
+        console.log('   Size:', req.file.size, 'bytes');
+        
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+            .from('Note app')
+            .upload(filePath, req.file.buffer, {
+                contentType: req.file.mimetype,
+                upsert: false
+            });
+        
+        if (error) {
+            console.error('❌ Supabase Storage upload error:', error);
+            throw error;
+        }
+        
+        // Get public URL
+        const { data: urlData } = supabase.storage
+            .from('Note app')
+            .getPublicUrl(filePath);
+        
+        console.log('✅ File uploaded successfully');
+        console.log('   Public URL:', urlData.publicUrl);
+        
+        res.json({
+            fileUrl: urlData.publicUrl,
+            fileName: req.file.originalname,
+            filePath: filePath
+        });
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        res.status(500).json({ error: 'Failed to upload file: ' + error.message });
+    }
+});
+
+// Upload file to Supabase Storage (base64, for web app)
+app.post('/api/upload/base64', authenticateUser, async (req, res) => {
     try {
         const { fileName, fileData, fileType, noteId } = req.body;
         
@@ -875,7 +929,45 @@ app.post('/api/notes', authenticateUser, async (req, res) => {
     }
 });
 
-// Update note attachments
+// Update note (full update)
+app.put('/api/notes/:id', authenticateUser, async (req, res) => {
+    try {
+        const noteId = req.params.id;
+        const { title, content, fileUrl, fileName } = req.body;
+        
+        console.log('📝 Updating note ID:', noteId);
+        
+        const updateData = {
+            title,
+            content
+        };
+        
+        if (fileUrl !== undefined) updateData.file_url = fileUrl;
+        if (fileName !== undefined) updateData.file_name = fileName;
+        
+        const { data, error } = await supabase
+            .from('notes')
+            .update(updateData)
+            .eq('id', noteId)
+            .eq('user_id', req.user.uid)  // Ensure user owns the note
+            .select()
+            .single();
+        
+        if (error) {
+            console.error('❌ Supabase update error:', error);
+            throw error;
+        }
+        
+        console.log('✅ Note updated successfully');
+        
+        res.json(data);
+    } catch (error) {
+        console.error('Error updating note:', error);
+        res.status(500).json({ error: 'Failed to update note: ' + error.message });
+    }
+});
+
+// Update note attachments (partial update)
 app.patch('/api/notes/:id', authenticateUser, async (req, res) => {
     try {
         const noteId = req.params.id;
@@ -902,6 +994,33 @@ app.patch('/api/notes/:id', authenticateUser, async (req, res) => {
     } catch (error) {
         console.error('Error updating note:', error);
         res.status(500).json({ error: 'Failed to update note: ' + error.message });
+    }
+});
+
+// Delete note
+app.delete('/api/notes/:id', authenticateUser, async (req, res) => {
+    try {
+        const noteId = req.params.id;
+        
+        console.log('🗑️ Deleting note ID:', noteId);
+        
+        const { error } = await supabase
+            .from('notes')
+            .delete()
+            .eq('id', noteId)
+            .eq('user_id', req.user.uid);  // Ensure user owns the note
+        
+        if (error) {
+            console.error('❌ Supabase delete error:', error);
+            throw error;
+        }
+        
+        console.log('✅ Note deleted successfully');
+        
+        res.json({ message: 'Note deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting note:', error);
+        res.status(500).json({ error: 'Failed to delete note: ' + error.message });
     }
 });
 

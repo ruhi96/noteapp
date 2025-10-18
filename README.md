@@ -12,6 +12,7 @@ A secure note-taking app with **Firebase Google Authentication**, **Node.js/Expr
 **Frontend:**
 - HTML5, CSS3, Vanilla JavaScript
 - Firebase Auth SDK
+- Android Native App (Java)
 
 **Deployment:**
 - Render
@@ -25,6 +26,7 @@ A secure note-taking app with **Firebase Google Authentication**, **Node.js/Expr
 - 🚀 RESTful API with JWT verification
 - 🎨 Modern, responsive UI
 - ☁️ Deploy to Render
+- 📱 Android Native App with file upload support
 
 ## Local Development Setup
 
@@ -89,6 +91,27 @@ npm start
 ```
 
 Open browser: **http://localhost:3001**
+
+## Android Client Setup
+
+A native Android client is available in the `android-client/` directory.
+
+**Features:**
+- ✅ Firebase Google Authentication
+- ✅ CRUD operations for notes
+- ✅ File upload & attachments
+- ✅ Premium status display (from Supabase)
+- ✅ Material Design 3 UI
+
+**Quick Setup:**
+1. Open `android-client/` in Android Studio Narwhal 4 Feature Drop | 2025.1.4
+2. Add `google-services.json` to `android-client/app/`
+3. Update `BASE_URL` in `Config.java`
+4. Run the app
+
+**Documentation:**
+- See [android-client/README.md](android-client/README.md) for detailed setup
+- See [ANDROID_CLIENT_SETUP.md](ANDROID_CLIENT_SETUP.md) for overview
 
 ## Deploy to Render
 
